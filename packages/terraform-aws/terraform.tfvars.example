@@ -1,0 +1,36 @@
+aws_region               = "us-east-1"
+project_name             = "hirely"
+environment              = "prod"
+
+# Your frontend URL (where the Next.js web app is hosted)
+frontend_url             = "https://hirely.com"
+
+# Domain — Route53 hosted zone + custom subdomain for the API
+# route53_zone_id        = "Z0123456789ABCDEFGHIJ"
+# api_domain_name        = "api.hirely.com"
+
+# Container settings
+api_image_tag            = "latest"
+api_desired_count        = 1
+api_cpu                  = 512
+api_memory               = 1024
+
+# Database
+db_name                  = "hirely"
+db_username              = "hirely"
+db_instance_class        = "db.t3.micro"
+
+# Redis
+redis_node_type          = "cache.t4g.micro"
+
+# Secrets — REPLACE these with real values before running terraform apply
+# Generate auth secret: openssl rand -base64 64
+better_auth_secret       = "replace-with-a-long-random-secret"
+google_client_id         = "your-google-client-id.apps.googleusercontent.com"
+google_client_secret     = "your-google-client-secret"
+openai_api_key           = "sk-your-openai-api-key"
+
+# CI/CD
+github_repo              = "jadewale/hirely"
+github_branch            = "main"
+codepipeline_enabled     = true

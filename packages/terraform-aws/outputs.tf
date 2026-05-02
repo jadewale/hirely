@@ -1,0 +1,54 @@
+output "aws_region" {
+  description = "AWS region"
+  value       = var.aws_region
+}
+
+output "api_ecr_repository_url" {
+  description = "ECR repository URL for the API image"
+  value       = aws_ecr_repository.api.repository_url
+}
+
+output "api_load_balancer_dns_name" {
+  description = "Public ALB DNS name for the API"
+  value       = aws_lb.api.dns_name
+}
+
+output "api_base_url" {
+  description = "Base URL for the deployed API"
+  value       = local.api_base_url
+}
+
+output "api_domain_name" {
+  description = "Custom API domain if configured"
+  value       = var.api_domain_name
+}
+
+output "ecs_cluster_name" {
+  description = "ECS cluster name"
+  value       = aws_ecs_cluster.main.name
+}
+
+output "ecs_service_name" {
+  description = "API ECS service name"
+  value       = aws_ecs_service.api.name
+}
+
+output "database_address" {
+  description = "RDS Postgres address"
+  value       = aws_db_instance.postgres.address
+}
+
+output "database_name" {
+  description = "RDS Postgres database name"
+  value       = aws_db_instance.postgres.db_name
+}
+
+output "redis_primary_endpoint" {
+  description = "Redis primary endpoint"
+  value       = aws_elasticache_replication_group.redis.primary_endpoint_address
+}
+
+output "google_redirect_uri" {
+  description = "Google OAuth redirect URI to configure in GCP"
+  value       = local.google_redirect_uri
+}
