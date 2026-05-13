@@ -20,7 +20,7 @@ resource "aws_ssm_parameter" "database_url" {
   name      = "/${local.name}/api/DATABASE_URL"
   type      = "SecureString"
   overwrite = true
-  value     = "postgresql://${var.db_username}:${random_password.db_password.result}@${aws_db_instance.postgres.address}:5432/${var.db_name}"
+  value     = "postgresql://${var.db_username}:${random_password.db_password.result}@${aws_db_instance.postgres.address}:5432/${var.db_name}?sslmode=require"
 
   tags = local.common_tags
 }

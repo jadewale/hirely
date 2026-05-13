@@ -1,0 +1,35 @@
+# Local smoke-test stack for the minimal API.
+#
+# Run from this directory:
+#   docker compose up --build
+#
+# Then in another terminal:
+#   curl http://localhost:4000/api/health
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: hirely-postgres
+    environment:
+      POSTGRES_DB: hirely
+      POSTGRES_USER: hirely
+      POSTGRES_PASSWORD: hirely
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hirely -d hirely"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    container_name: hirely-api
+    environment:
+      DATABASE_URL: postgresql://hirely:hirely@postgres:5432/hirely
+      PORT: "4000"
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy

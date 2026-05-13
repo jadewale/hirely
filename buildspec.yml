@@ -1,0 +1,40 @@
+# CodeBuild instructions for the API CI/CD pipeline.
+# Triggered by CodePipeline Source -> Build stage.
+#
+# Inputs (injected by Terraform via CodeBuild env vars):
+#   ECR_REPO_URI        - e.g. 966805055435.dkr.ecr.us-east-1.amazonaws.com/hirely-prod-api
+#   AWS_DEFAULT_REGION  - e.g. us-east-1
+#
+# Output artifact:
+#   imagedefinitions.json - consumed by the ECS Deploy stage to update the
+#   task definition's container image. Container name MUST match the
+#   container_definitions name in aws_ecs_task_definition.api ("api").
+
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo "Logging in to ECR..."
+      - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ECR_REPO_URI"
+      - COMMIT_SHA=$(echo "$CODEBUILD_RESOLVED_SOURCE_VERSION" | cut -c1-8)
+      - echo "Building commit $COMMIT_SHA"
+
+  build:
+    commands:
+      - echo "Building image..."
+      - docker build -f apps/api/Dockerfile -t "$ECR_REPO_URI:latest" -t "$ECR_REPO_URI:$COMMIT_SHA" .
+
+  post_build:
+    commands:
+      - echo "Pushing image to ECR..."
+      - docker push "$ECR_REPO_URI:latest"
+      - docker push "$ECR_REPO_URI:$COMMIT_SHA"
+      # Pin the deployed task def to the SHA tag (not :latest) so rollbacks
+      # are possible by re-deploying an earlier task def revision.
+      - printf '[{"name":"api","imageUri":"%s"}]' "$ECR_REPO_URI:$COMMIT_SHA" > imagedefinitions.json
+      - cat imagedefinitions.json
+
+artifacts:
+  files:
+    - imagedefinitions.json

@@ -1,8 +1,8 @@
-import { Global, Module } from "@nestjs/common";
-import { db } from "./index";
+import { Global, Module } from '@nestjs/common';
+import { db } from './index';
 
 const DB_PROVIDER = {
-  provide: "DATABASE",
+  provide: 'DATABASE',
   useValue: db,
 };
 
