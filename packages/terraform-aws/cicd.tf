@@ -44,8 +44,8 @@ resource "aws_iam_role" "codebuild" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
       Principal = { Service = "codebuild.amazonaws.com" }
     }]
   })
@@ -97,6 +97,39 @@ resource "aws_iam_role_policy" "codebuild" {
         ]
         Resource = "*"
       },
+      # CodeBuild now owns deploy: it renders the task definition from the
+      # versioned template, registers a new revision, rolls the service, and
+      # waits for stability.
+      {
+        Effect = "Allow"
+        Action = [
+          "ecs:RegisterTaskDefinition",
+          "ecs:DescribeTaskDefinition",
+          "ecs:DescribeServices",
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ecs:UpdateService",
+        ]
+        Resource = aws_ecs_service.api.id
+      },
+      # Required so register-task-definition can attach the execution + task roles.
+      {
+        Effect = "Allow"
+        Action = "iam:PassRole"
+        Resource = [
+          aws_iam_role.ecs_execution.arn,
+          aws_iam_role.ecs_task.arn,
+        ]
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "ecs-tasks.amazonaws.com"
+          }
+        }
+      },
     ]
   })
 }
@@ -134,6 +167,113 @@ resource "aws_codebuild_project" "api" {
       name  = "BASE_BUN_REPO"
       value = aws_ecr_repository.base_bun.repository_url
     }
+
+    # ── Task-definition template inputs ───────────────────────────────────────
+    # CodeBuild renders apps/api/taskdef.template.json with these values.
+
+    environment_variable {
+      name  = "TASK_FAMILY"
+      value = "${local.name}-api"
+    }
+
+    environment_variable {
+      name  = "API_CPU"
+      value = tostring(var.api_cpu)
+    }
+
+    environment_variable {
+      name  = "API_MEMORY"
+      value = tostring(var.api_memory)
+    }
+
+    environment_variable {
+      name  = "API_PORT"
+      value = tostring(var.api_container_port)
+    }
+
+    environment_variable {
+      name  = "EXECUTION_ROLE_ARN"
+      value = aws_iam_role.ecs_execution.arn
+    }
+
+    environment_variable {
+      name  = "TASK_ROLE_ARN"
+      value = aws_iam_role.ecs_task.arn
+    }
+
+    environment_variable {
+      name  = "LOG_GROUP"
+      value = aws_cloudwatch_log_group.api.name
+    }
+
+    environment_variable {
+      name  = "ECS_CLUSTER"
+      value = aws_ecs_cluster.main.name
+    }
+
+    environment_variable {
+      name  = "ECS_SERVICE"
+      value = aws_ecs_service.api.name
+    }
+
+    # Non-secret container env vars
+
+    environment_variable {
+      name  = "REDIS_HOST"
+      value = aws_elasticache_replication_group.redis.primary_endpoint_address
+    }
+
+    environment_variable {
+      name  = "FRONTEND_URL"
+      value = var.frontend_url
+    }
+
+    environment_variable {
+      name  = "BETTER_AUTH_URL"
+      value = local.api_base_url
+    }
+
+    environment_variable {
+      name  = "GOOGLE_REDIRECT_URI"
+      value = local.google_redirect_uri
+    }
+
+    # SSM parameter ARNs for secrets (values stay in SSM, never in env vars)
+
+    environment_variable {
+      name  = "DATABASE_URL_ARN"
+      value = aws_ssm_parameter.database_url.arn
+    }
+
+    environment_variable {
+      name  = "BETTER_AUTH_SECRET_ARN"
+      value = aws_ssm_parameter.better_auth_secret.arn
+    }
+
+    environment_variable {
+      name  = "GOOGLE_CLIENT_ID_ARN"
+      value = aws_ssm_parameter.google_client_id.arn
+    }
+
+    environment_variable {
+      name  = "GOOGLE_CLIENT_SECRET_ARN"
+      value = aws_ssm_parameter.google_client_secret.arn
+    }
+
+    environment_variable {
+      name  = "OPENAI_API_KEY_ARN"
+      value = aws_ssm_parameter.openai_api_key.arn
+    }
+
+    environment_variable {
+      name  = "INNGEST_SIGNING_KEY_ARN"
+      value = aws_ssm_parameter.inngest_signing_key.arn
+    }
+
+    environment_variable {
+      name  = "INNGEST_EVENT_KEY_ARN"
+      value = aws_ssm_parameter.inngest_event_key.arn
+    }
   }
 
   source {
@@ -160,8 +300,8 @@ resource "aws_iam_role" "codepipeline" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
       Principal = { Service = "codepipeline.amazonaws.com" }
     }]
   })
@@ -282,11 +422,15 @@ resource "aws_codepipeline" "api" {
     }
   }
 
+  # Build is now the deploy: CodeBuild builds + pushes the image, renders
+  # apps/api/taskdef.template.json from env vars, registers a new task-def
+  # revision, calls UpdateService, and waits for the rollout to stabilize.
+  # No separate Deploy stage — single owner, no copy-from-running-rev drift.
   stage {
     name = "Build"
 
     action {
-      name             = "BuildAndPush"
+      name             = "BuildAndDeploy"
       category         = "Build"
       owner            = "AWS"
       provider         = "CodeBuild"
@@ -296,24 +440,6 @@ resource "aws_codepipeline" "api" {
 
       configuration = {
         ProjectName = aws_codebuild_project.api[0].name
-      }
-    }
-  }
-
-  stage {
-    name = "Deploy"
-
-    action {
-      name            = "DeployToECS"
-      category        = "Deploy"
-      owner           = "AWS"
-      provider        = "ECS"
-      version         = "1"
-      input_artifacts = ["build_output"]
-
-      configuration = {
-        ClusterName = aws_ecs_cluster.main.name
-        ServiceName = aws_ecs_service.api.name
       }
     }
   }

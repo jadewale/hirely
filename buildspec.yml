@@ -1,14 +1,26 @@
 # CodeBuild instructions for the API CI/CD pipeline.
-# Triggered by CodePipeline Source -> Build stage.
+#
+# Build now fully owns deploy: image is tagged with the resolved commit SHA
+# (never `:latest`), the task definition is rendered from the versioned
+# template at apps/api/taskdef.template.json, a new revision is registered,
+# and the service is rolled. Predictable + auditable + rollback by re-deploying
+# any previous revision.
 #
 # Inputs (injected by Terraform via CodeBuild env vars):
-#   ECR_REPO_URI        - e.g. 966805055435.dkr.ecr.us-east-1.amazonaws.com/hirely-prod-api
-#   AWS_DEFAULT_REGION  - e.g. us-east-1
-#
-# Output artifact:
-#   imagedefinitions.json - consumed by the ECS Deploy stage to update the
-#   task definition's container image. Container name MUST match the
-#   container_definitions name in aws_ecs_task_definition.api ("api").
+#   ECR_REPO_URI                  registry + repo for the API image
+#   AWS_DEFAULT_REGION            e.g. us-east-1
+#   BASE_BUN_REPO                 ECR mirror of oven/bun base images
+#   TASK_FAMILY                   ECS task definition family name
+#   API_CPU / API_MEMORY          Fargate sizing
+#   API_PORT                      container port (number)
+#   EXECUTION_ROLE_ARN            for pulling image + reading SSM
+#   TASK_ROLE_ARN                 for the running container
+#   LOG_GROUP                     CloudWatch Logs target
+#   ECS_CLUSTER / ECS_SERVICE     deployment target
+#   REDIS_HOST, FRONTEND_URL,
+#   BETTER_AUTH_URL,
+#   GOOGLE_REDIRECT_URI           non-secret env vars surfaced to the container
+#   *_ARN                         SSM parameter ARNs for each secret
 
 version: 0.2
 
@@ -17,8 +29,9 @@ phases:
     commands:
       - echo "Logging in to ECR..."
       - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ECR_REPO_URI"
-      - COMMIT_SHA=$(echo "$CODEBUILD_RESOLVED_SOURCE_VERSION" | cut -c1-8)
-      - echo "Building commit $COMMIT_SHA"
+      - export COMMIT_SHA="$CODEBUILD_RESOLVED_SOURCE_VERSION"
+      - export IMAGE_URI="$ECR_REPO_URI:$COMMIT_SHA"
+      - echo "Image tag $IMAGE_URI"
 
   build:
     commands:
@@ -27,20 +40,21 @@ phases:
           --build-arg BUN_BUILDER_IMAGE="$BASE_BUN_REPO:1.3.1"
           --build-arg BUN_RUNNER_IMAGE="$BASE_BUN_REPO:1.3.1-slim"
           -f apps/api/Dockerfile
-          -t "$ECR_REPO_URI:latest"
-          -t "$ECR_REPO_URI:$COMMIT_SHA"
+          -t "$IMAGE_URI"
           .
 
   post_build:
     commands:
-      - echo "Pushing image to ECR..."
-      - docker push "$ECR_REPO_URI:latest"
-      - docker push "$ECR_REPO_URI:$COMMIT_SHA"
-      # Pin the deployed task def to the SHA tag (not :latest) so rollbacks
-      # are possible by re-deploying an earlier task def revision.
-      - printf '[{"name":"api","imageUri":"%s"}]' "$ECR_REPO_URI:$COMMIT_SHA" > imagedefinitions.json
-      - cat imagedefinitions.json
-
-artifacts:
-  files:
-    - imagedefinitions.json
+      - echo "Pushing image..."
+      - docker push "$IMAGE_URI"
+      - echo "Rendering task definition..."
+      - envsubst < apps/api/taskdef.template.json > taskdef.json
+      - cat taskdef.json
+      - echo "Registering task definition..."
+      - TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://taskdef.json --query 'taskDefinition.taskDefinitionArn' --output text)
+      - echo "Registered $TASK_DEF_ARN"
+      - echo "Updating service..."
+      - aws ecs update-service --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE" --task-definition "$TASK_DEF_ARN" --query 'service.deployments[0].rolloutState' --output text
+      - echo "Waiting for service to stabilize..."
+      - aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
+      - echo "Deploy complete. Running revision $TASK_DEF_ARN"
