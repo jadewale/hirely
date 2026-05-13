@@ -76,6 +76,26 @@ resource "aws_ssm_parameter" "openai_api_key" {
   tags = local.common_tags
 }
 
+resource "aws_ssm_parameter" "inngest_signing_key" {
+  name      = "/${local.name}/api/INNGEST_SIGNING_KEY"
+  type      = "SecureString"
+  overwrite = true
+  # SSM disallows empty SecureString values; fall back to a placeholder until
+  # a real key is provided in terraform.tfvars.
+  value = var.inngest_signing_key != "" ? var.inngest_signing_key : "unset"
+
+  tags = local.common_tags
+}
+
+resource "aws_ssm_parameter" "inngest_event_key" {
+  name      = "/${local.name}/api/INNGEST_EVENT_KEY"
+  type      = "SecureString"
+  overwrite = true
+  value     = var.inngest_event_key != "" ? var.inngest_event_key : "unset"
+
+  tags = local.common_tags
+}
+
 resource "aws_iam_role" "ecs_execution" {
   name = "${local.name}-ecs-execution"
 
@@ -120,6 +140,8 @@ resource "aws_iam_role_policy" "ecs_execution_ssm" {
           aws_ssm_parameter.google_client_id.arn,
           aws_ssm_parameter.google_client_secret.arn,
           aws_ssm_parameter.openai_api_key.arn,
+          aws_ssm_parameter.inngest_signing_key.arn,
+          aws_ssm_parameter.inngest_event_key.arn,
         ]
       },
       {
@@ -316,6 +338,8 @@ resource "aws_ecs_task_definition" "api" {
         { name = "GOOGLE_CLIENT_ID", valueFrom = aws_ssm_parameter.google_client_id.arn },
         { name = "GOOGLE_CLIENT_SECRET", valueFrom = aws_ssm_parameter.google_client_secret.arn },
         { name = "OPENAI_API_KEY", valueFrom = aws_ssm_parameter.openai_api_key.arn },
+        { name = "INNGEST_SIGNING_KEY", valueFrom = aws_ssm_parameter.inngest_signing_key.arn },
+        { name = "INNGEST_EVENT_KEY", valueFrom = aws_ssm_parameter.inngest_event_key.arn },
       ]
       logConfiguration = {
         logDriver = "awslogs"

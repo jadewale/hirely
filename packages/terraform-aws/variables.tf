@@ -150,6 +150,20 @@ variable "openai_api_key" {
   sensitive   = true
 }
 
+variable "inngest_signing_key" {
+  description = "Inngest Cloud signing key (verifies inbound webhook calls from Inngest)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "inngest_event_key" {
+  description = "Inngest Cloud event key (signs outbound events from this app)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "github_repo" {
   description = "GitHub repository in owner/repo format"
   type        = string
