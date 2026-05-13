@@ -134,7 +134,9 @@ resource "aws_iam_role_policy" "codebuild" {
   })
 }
 
-# ── CodeBuild Project ────────────────────────────────────────────────────────
+# ── CodeBuild: Build ─────────────────────────────────────────────────────────
+# Build the Docker image, push to ECR (SHA-tagged), and hand the image URI
+# off to the Deploy stage via the image_uri.txt artifact.
 
 resource "aws_codebuild_project" "api" {
   count        = var.codepipeline_enabled ? 1 : 0
@@ -167,9 +169,51 @@ resource "aws_codebuild_project" "api" {
       name  = "BASE_BUN_REPO"
       value = aws_ecr_repository.base_bun.repository_url
     }
+  }
 
-    # ── Task-definition template inputs ───────────────────────────────────────
-    # CodeBuild renders apps/api/taskdef.template.json with these values.
+  source {
+    type      = "CODEPIPELINE"
+    buildspec = "buildspec.yml"
+  }
+
+  logs_config {
+    cloudwatch_logs {
+      group_name  = "/codebuild/${local.name}-api"
+      stream_name = "build"
+    }
+  }
+
+  tags = local.common_tags
+}
+
+# ── CodeBuild: Deploy ────────────────────────────────────────────────────────
+# Render apps/api/taskdef.template.json with the image URI from Build, register
+# a new ECS task-def revision, roll the service, and wait for stability.
+
+resource "aws_codebuild_project" "api_deploy" {
+  count        = var.codepipeline_enabled ? 1 : 0
+  name         = "${local.name}-api-deploy"
+  description  = "Render task definition, register revision, roll ECS service"
+  service_role = aws_iam_role.codebuild[0].arn
+
+  artifacts {
+    type = "CODEPIPELINE"
+  }
+
+  environment {
+    compute_type                = "BUILD_GENERAL1_SMALL"
+    image                       = "aws/codebuild/standard:7.0"
+    type                        = "LINUX_CONTAINER"
+    image_pull_credentials_type = "CODEBUILD"
+    # privileged_mode is intentionally not set — Deploy doesn't touch Docker.
+
+    environment_variable {
+      name  = "AWS_DEFAULT_REGION"
+      value = var.aws_region
+    }
+
+    # ── Task-definition template inputs ─────────────────────────────────────
+    # deployspec.yml runs envsubst on apps/api/taskdef.template.json with these.
 
     environment_variable {
       name  = "TASK_FAMILY"
@@ -278,13 +322,13 @@ resource "aws_codebuild_project" "api" {
 
   source {
     type      = "CODEPIPELINE"
-    buildspec = "buildspec.yml"
+    buildspec = "deployspec.yml"
   }
 
   logs_config {
     cloudwatch_logs {
       group_name  = "/codebuild/${local.name}-api"
-      stream_name = "build"
+      stream_name = "deploy"
     }
   }
 
@@ -340,7 +384,10 @@ resource "aws_iam_role_policy" "codepipeline" {
           "codebuild:BatchGetBuilds",
           "codebuild:StartBuild",
         ]
-        Resource = aws_codebuild_project.api[0].arn
+        Resource = [
+          aws_codebuild_project.api[0].arn,
+          aws_codebuild_project.api_deploy[0].arn,
+        ]
       },
       {
         Effect = "Allow"
@@ -422,15 +469,12 @@ resource "aws_codepipeline" "api" {
     }
   }
 
-  # Build is now the deploy: CodeBuild builds + pushes the image, renders
-  # apps/api/taskdef.template.json from env vars, registers a new task-def
-  # revision, calls UpdateService, and waits for the rollout to stabilize.
-  # No separate Deploy stage — single owner, no copy-from-running-rev drift.
+  # Build: docker build + push, hand image_uri.txt to Deploy via build_output.
   stage {
     name = "Build"
 
     action {
-      name             = "BuildAndDeploy"
+      name             = "BuildAndPush"
       category         = "Build"
       owner            = "AWS"
       provider         = "CodeBuild"
@@ -440,6 +484,27 @@ resource "aws_codepipeline" "api" {
 
       configuration = {
         ProjectName = aws_codebuild_project.api[0].name
+      }
+    }
+  }
+
+  # Deploy: render task-def template (source_output) using the image URI
+  # produced by Build (build_output), register a new ECS revision, roll the
+  # service, and wait for stability.
+  stage {
+    name = "Deploy"
+
+    action {
+      name            = "DeployToECS"
+      category        = "Build"
+      owner           = "AWS"
+      provider        = "CodeBuild"
+      version         = "1"
+      input_artifacts = ["source_output", "build_output"]
+
+      configuration = {
+        ProjectName   = aws_codebuild_project.api_deploy[0].name
+        PrimarySource = "source_output"
       }
     }
   }

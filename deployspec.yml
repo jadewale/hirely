@@ -1,0 +1,42 @@
+# CodeBuild instructions for the **Deploy** stage of the API pipeline.
+# Responsibility: render the task definition from the versioned template
+# using values supplied via env vars + the image URI produced by Build,
+# register a new ECS task-def revision, roll the service, and wait for
+# stability.
+#
+# Inputs:
+#   $CODEBUILD_SRC_DIR                        primary input  = source_output
+#                                             (the repo, contains taskdef.template.json)
+#   $CODEBUILD_SRC_DIR_build_output           secondary input = build_output
+#                                             (contains image_uri.txt from Build)
+#
+# Env vars (injected by Terraform; see cicd.tf > aws_codebuild_project.deploy):
+#   AWS_DEFAULT_REGION                        e.g. us-east-1
+#   TASK_FAMILY                               ECS task-def family name
+#   API_CPU / API_MEMORY                      Fargate sizing (strings)
+#   API_PORT                                  container port (number)
+#   EXECUTION_ROLE_ARN / TASK_ROLE_ARN        for the task definition
+#   LOG_GROUP                                 CloudWatch Logs target
+#   ECS_CLUSTER / ECS_SERVICE                 deployment target
+#   REDIS_HOST, FRONTEND_URL,
+#   BETTER_AUTH_URL, GOOGLE_REDIRECT_URI      non-secret container env vars
+#   *_ARN                                     SSM parameter ARNs for each secret
+
+version: 0.2
+
+phases:
+  build:
+    commands:
+      - export IMAGE_URI=$(cat "$CODEBUILD_SRC_DIR_build_output/image_uri.txt")
+      - echo "Deploying $IMAGE_URI"
+      - echo "Rendering task definition..."
+      - envsubst < "$CODEBUILD_SRC_DIR/apps/api/taskdef.template.json" > taskdef.json
+      - cat taskdef.json
+      - echo "Registering task definition..."
+      - TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://taskdef.json --query 'taskDefinition.taskDefinitionArn' --output text)
+      - echo "Registered $TASK_DEF_ARN"
+      - echo "Updating service..."
+      - aws ecs update-service --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE" --task-definition "$TASK_DEF_ARN" --query 'service.deployments[0].rolloutState' --output text
+      - echo "Waiting for service to stabilize..."
+      - aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
+      - echo "Deploy complete. Running revision $TASK_DEF_ARN"

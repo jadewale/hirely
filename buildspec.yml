@@ -1,26 +1,17 @@
-# CodeBuild instructions for the API CI/CD pipeline.
+# CodeBuild instructions for the **Build** stage of the API pipeline.
+# Responsibility: build the Docker image, push it to ECR (SHA-tagged), and
+# hand the resulting image URI off to the Deploy stage via an artifact.
 #
-# Build now fully owns deploy: image is tagged with the resolved commit SHA
-# (never `:latest`), the task definition is rendered from the versioned
-# template at apps/api/taskdef.template.json, a new revision is registered,
-# and the service is rolled. Predictable + auditable + rollback by re-deploying
-# any previous revision.
+# The Deploy stage (deployspec.yml) renders the task definition and rolls
+# the service. Build never touches ECS.
 #
 # Inputs (injected by Terraform via CodeBuild env vars):
-#   ECR_REPO_URI                  registry + repo for the API image
-#   AWS_DEFAULT_REGION            e.g. us-east-1
-#   BASE_BUN_REPO                 ECR mirror of oven/bun base images
-#   TASK_FAMILY                   ECS task definition family name
-#   API_CPU / API_MEMORY          Fargate sizing
-#   API_PORT                      container port (number)
-#   EXECUTION_ROLE_ARN            for pulling image + reading SSM
-#   TASK_ROLE_ARN                 for the running container
-#   LOG_GROUP                     CloudWatch Logs target
-#   ECS_CLUSTER / ECS_SERVICE     deployment target
-#   REDIS_HOST, FRONTEND_URL,
-#   BETTER_AUTH_URL,
-#   GOOGLE_REDIRECT_URI           non-secret env vars surfaced to the container
-#   *_ARN                         SSM parameter ARNs for each secret
+#   ECR_REPO_URI         e.g. 966805055435.dkr.ecr.us-east-1.amazonaws.com/hirely-prod-api
+#   AWS_DEFAULT_REGION   e.g. us-east-1
+#   BASE_BUN_REPO        ECR mirror of oven/bun base images
+#
+# Output artifact:
+#   image_uri.txt        single line with the SHA-tagged image URI
 
 version: 0.2
 
@@ -47,14 +38,9 @@ phases:
     commands:
       - echo "Pushing image..."
       - docker push "$IMAGE_URI"
-      - echo "Rendering task definition..."
-      - envsubst < apps/api/taskdef.template.json > taskdef.json
-      - cat taskdef.json
-      - echo "Registering task definition..."
-      - TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://taskdef.json --query 'taskDefinition.taskDefinitionArn' --output text)
-      - echo "Registered $TASK_DEF_ARN"
-      - echo "Updating service..."
-      - aws ecs update-service --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE" --task-definition "$TASK_DEF_ARN" --query 'service.deployments[0].rolloutState' --output text
-      - echo "Waiting for service to stabilize..."
-      - aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
-      - echo "Deploy complete. Running revision $TASK_DEF_ARN"
+      - echo "$IMAGE_URI" > image_uri.txt
+      - cat image_uri.txt
+
+artifacts:
+  files:
+    - image_uri.txt

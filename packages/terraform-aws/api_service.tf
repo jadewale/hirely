@@ -302,63 +302,26 @@ resource "aws_route53_record" "api_alias" {
   }
 }
 
-resource "aws_ecs_task_definition" "api" {
-  family                   = "${local.name}-api"
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = tostring(var.api_cpu)
-  memory                   = tostring(var.api_memory)
-  execution_role_arn       = aws_iam_role.ecs_execution.arn
-  task_role_arn            = aws_iam_role.ecs_task.arn
-
-  container_definitions = jsonencode([
-    {
-      name      = "api"
-      image     = "${aws_ecr_repository.api.repository_url}:${var.api_image_tag}"
-      essential = true
-      portMappings = [
-        {
-          containerPort = var.api_container_port
-          hostPort      = var.api_container_port
-          protocol      = "tcp"
-        }
-      ]
-      environment = [
-        { name = "NODE_ENV", value = "production" },
-        { name = "PORT", value = tostring(var.api_container_port) },
-        { name = "REDIS_HOST", value = aws_elasticache_replication_group.redis.primary_endpoint_address },
-        { name = "REDIS_PORT", value = "6379" },
-        { name = "FRONTEND_URL", value = var.frontend_url },
-        { name = "BETTER_AUTH_URL", value = local.api_base_url },
-        { name = "GOOGLE_REDIRECT_URI", value = local.google_redirect_uri },
-      ]
-      secrets = [
-        { name = "DATABASE_URL", valueFrom = aws_ssm_parameter.database_url.arn },
-        { name = "BETTER_AUTH_SECRET", valueFrom = aws_ssm_parameter.better_auth_secret.arn },
-        { name = "GOOGLE_CLIENT_ID", valueFrom = aws_ssm_parameter.google_client_id.arn },
-        { name = "GOOGLE_CLIENT_SECRET", valueFrom = aws_ssm_parameter.google_client_secret.arn },
-        { name = "OPENAI_API_KEY", valueFrom = aws_ssm_parameter.openai_api_key.arn },
-        { name = "INNGEST_SIGNING_KEY", valueFrom = aws_ssm_parameter.inngest_signing_key.arn },
-        { name = "INNGEST_EVENT_KEY", valueFrom = aws_ssm_parameter.inngest_event_key.arn },
-      ]
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          awslogs-group         = aws_cloudwatch_log_group.api.name
-          awslogs-region        = var.aws_region
-          awslogs-stream-prefix = "ecs"
-        }
-      }
-    }
-  ])
-
-  tags = local.common_tags
+# The task definition is owned by CI/CD (apps/api/taskdef.template.json is
+# the source of truth; deployspec.yml renders it and registers each revision).
+# Terraform just reads the latest ACTIVE revision so the service can be
+# created on a fresh apply if a revision already exists. After that, the
+# service's `ignore_changes = [task_definition]` lets CodeBuild keep rolling
+# new revisions without Terraform fighting them.
+#
+# Fresh-deploy bootstrap: on a brand-new account, run one CI/CD build first
+# (it'll fail at the UpdateService step because the service doesn't exist
+# yet, but it WILL register a task-def revision). Then `terraform apply` —
+# the service is created pointing at that revision. From then on, the
+# pipeline runs cleanly.
+data "aws_ecs_task_definition" "api" {
+  task_definition = "${local.name}-api"
 }
 
 resource "aws_ecs_service" "api" {
   name                              = "${local.name}-api"
   cluster                           = aws_ecs_cluster.main.id
-  task_definition                   = aws_ecs_task_definition.api.arn
+  task_definition                   = data.aws_ecs_task_definition.api.arn
   desired_count                     = var.api_desired_count
   launch_type                       = "FARGATE"
   health_check_grace_period_seconds = 60
