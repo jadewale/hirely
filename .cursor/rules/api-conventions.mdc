@@ -1,0 +1,28 @@
+---
+description: Conventions for editing the NestJS API under apps/api
+globs: apps/api/**/*.ts
+alwaysApply: false
+---
+
+# `apps/api` conventions
+
+- Runtime is Bun. Install deps with `bun add <pkg>` inside `apps/api/`, never
+  `npm install`. The lockfile is `bun.lock` at the repo root.
+- Every controller route MUST carry `@ApiTags`, `@ApiOperation` (with a
+  stable `operationId`), and an `@ApiOkResponse({ type: SomeDto })`. Both
+  request bodies and responses need typed DTO classes with `@ApiProperty`
+  decorators so they appear in `/api/docs-json`.
+- Tests live next to the code: `*.spec.ts` for unit (under `src/`),
+  `*.e2e-spec.ts` for end-to-end (under `test/`). Mock the `DATABASE`
+  provider with `.overrideProvider('DATABASE').useValue(...)` rather than
+  spinning up real Postgres in tests.
+- Shared bootstrap wiring (global prefix, body parser, Swagger, Inngest)
+  lives in `src/bootstrap.ts` so `main.ts` and e2e tests can both call
+  `configureApp(app)` and stay in sync.
+- Inngest functions go in `src/inngest/functions/<name>.ts`, one file per
+  function. Re-export them via `src/inngest/functions/index.ts` so
+  `bootstrap.ts` sees a flat list.
+- Drizzle schema is `src/db/schema.ts`. New tables ship with a generated
+  migration (`bun run db:generate`) committed to the repo.
+- Do NOT add code comments that narrate what the code does. Comments are for
+  non-obvious intent, trade-offs, or constraints.

@@ -1,0 +1,31 @@
+---
+description: Rules for editing Terraform + CI/CD without breaking the deploy
+globs: packages/terraform-aws/**,buildspec.yml,deployspec.yml,apps/api/taskdef.template.json,apps/api/Dockerfile
+alwaysApply: false
+---
+
+# Infra + deploy rules
+
+The deploy is **CodeBuild-owned**, not Terraform-owned. The pipeline is
+Source → Build → Deploy, all wired in `packages/terraform-aws/cicd.tf`.
+
+Hard rules:
+
+- The ECS task definition is the single source of truth at
+  `apps/api/taskdef.template.json`. Terraform reads the latest active
+  revision via `data "aws_ecs_task_definition" "api"` only — do NOT add an
+  `aws_ecs_task_definition` resource back.
+- `aws_ecs_service.api` keeps `lifecycle { ignore_changes = [task_definition] }`.
+  Don't remove it; CodeBuild rolls revisions every deploy.
+- Images are tagged with the full commit SHA. Never push or deploy `:latest`.
+- New runtime env vars require BOTH (a) a placeholder in
+  `apps/api/taskdef.template.json` AND (b) a matching `environment_variable`
+  in the `aws_codebuild_project.api_deploy` resource so `envsubst` can fill
+  it in. Secret vars also need an SSM parameter and the deploy role's
+  policy must allow `ssm:GetParameters` on its ARN.
+- Base images (Bun, Postgres) are pulled from the ECR mirror
+  (`hirely-prod-base/bun`, `public.ecr.aws/docker/library/postgres`) to
+  avoid Docker Hub rate limits in CodeBuild. Don't switch back to
+  `oven/bun` or `library/postgres` on Docker Hub.
+- Never commit `terraform.tfvars` or `*.tfstate*`. They are gitignored for a
+  reason.
