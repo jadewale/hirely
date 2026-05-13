@@ -8,6 +8,11 @@ output "api_ecr_repository_url" {
   value       = aws_ecr_repository.api.repository_url
 }
 
+output "base_bun_ecr_repository_url" {
+  description = "ECR mirror for oven/bun base images (avoids Docker Hub rate limits in CodeBuild)"
+  value       = aws_ecr_repository.base_bun.repository_url
+}
+
 output "api_load_balancer_dns_name" {
   description = "Public ALB DNS name for the API"
   value       = aws_lb.api.dns_name

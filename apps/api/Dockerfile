@@ -1,9 +1,16 @@
 # syntax=docker/dockerfile:1.7
 # Build context: monorepo root
 #   docker build -f apps/api/Dockerfile -t hirely-api .
+#
+# Base image overrides (used by CI to point at an ECR mirror that
+# isn't rate-limited like anonymous Docker Hub pulls from CodeBuild
+# shared egress IPs). Default values keep local builds simple.
+
+ARG BUN_BUILDER_IMAGE=oven/bun:1.3.1
+ARG BUN_RUNNER_IMAGE=oven/bun:1.3.1-slim
 
 # ---- builder ----
-FROM oven/bun:1.3.1 AS builder
+FROM ${BUN_BUILDER_IMAGE} AS builder
 
 WORKDIR /app
 
@@ -21,7 +28,7 @@ COPY apps/api apps/api
 RUN bun run --cwd apps/api build
 
 # ---- runner ----
-FROM oven/bun:1.3.1-slim AS runner
+FROM ${BUN_RUNNER_IMAGE} AS runner
 
 RUN groupadd --system --gid 1001 appgroup && \
     useradd --system --uid 1001 --gid appgroup --no-create-home appuser

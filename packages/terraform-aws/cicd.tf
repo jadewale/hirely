@@ -129,6 +129,11 @@ resource "aws_codebuild_project" "api" {
       name  = "AWS_DEFAULT_REGION"
       value = var.aws_region
     }
+
+    environment_variable {
+      name  = "BASE_BUN_REPO"
+      value = aws_ecr_repository.base_bun.repository_url
+    }
   }
 
   source {

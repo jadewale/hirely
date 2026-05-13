@@ -9,6 +9,21 @@ resource "aws_ecr_repository" "api" {
   tags = local.common_tags
 }
 
+# Mirror of the Bun base images we FROM in apps/api/Dockerfile.
+# CodeBuild's shared egress IP gets rate-limited by Docker Hub on
+# anonymous pulls of oven/bun. Pulling through our own ECR repo
+# avoids that entirely.
+resource "aws_ecr_repository" "base_bun" {
+  name                 = "${local.name}-base/bun"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = false
+  }
+
+  tags = local.common_tags
+}
+
 resource "aws_cloudwatch_log_group" "api" {
   name              = "/ecs/${local.name}/api"
   retention_in_days = 14
