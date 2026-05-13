@@ -362,5 +362,13 @@ resource "aws_ecs_service" "api" {
     aws_elasticache_replication_group.redis
   ]
 
+  # CodePipeline's ECS Deploy stage registers new task-definition revisions
+  # and updates the service to point at them. Terraform must not try to
+  # revert that, or every `terraform apply` would roll the live app back to
+  # whatever image tag was deployed manually before CI took over.
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
+
   tags = local.common_tags
 }

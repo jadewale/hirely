@@ -234,13 +234,32 @@ resource "aws_iam_role_policy" "codepipeline" {
 # ── CodePipeline ─────────────────────────────────────────────────────────────
 
 resource "aws_codepipeline" "api" {
-  count    = var.codepipeline_enabled ? 1 : 0
-  name     = "${local.name}-api"
-  role_arn = aws_iam_role.codepipeline[0].arn
+  count         = var.codepipeline_enabled ? 1 : 0
+  name          = "${local.name}-api"
+  role_arn      = aws_iam_role.codepipeline[0].arn
+  pipeline_type = "V2"
 
   artifact_store {
     location = aws_s3_bucket.pipeline_artifacts[0].bucket
     type     = "S3"
+  }
+
+  # V2 trigger block — registers an explicit GitHub-App event filter via
+  # the CodeStar connection. Avoids the V1 race where the source action's
+  # implicit subscription silently fails to register if the connection is
+  # PENDING at pipeline-create time.
+  trigger {
+    provider_type = "CodeStarSourceConnection"
+
+    git_configuration {
+      source_action_name = "GitHub"
+
+      push {
+        branches {
+          includes = [var.github_branch]
+        }
+      }
+    }
   }
 
   stage {
@@ -258,6 +277,7 @@ resource "aws_codepipeline" "api" {
         ConnectionArn    = aws_codestarconnections_connection.github[0].arn
         FullRepositoryId = var.github_repo
         BranchName       = var.github_branch
+        DetectChanges    = "false"
       }
     }
   }
