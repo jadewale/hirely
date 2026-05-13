@@ -12,6 +12,11 @@ alwaysApply: false
   stable `operationId`), and an `@ApiOkResponse({ type: SomeDto })`. Both
   request bodies and responses need typed DTO classes with `@ApiProperty`
   decorators so they appear in `/api/docs-json`.
+- Business logic lives in a `*.service.ts`, NOT in the controller. The
+  controller delegates to the service. The MCP tool in
+  `src/mcp/mcp.service.ts` ALSO delegates to the same service, so the HTTP
+  surface and the agent surface stay in sync. Every new route ships with a
+  matching MCP tool registered via `server.registerTool(...)`.
 - Tests live next to the code: `*.spec.ts` for unit (under `src/`),
   `*.e2e-spec.ts` for end-to-end (under `test/`). Mock the `DATABASE`
   provider with `.overrideProvider('DATABASE').useValue(...)` rather than

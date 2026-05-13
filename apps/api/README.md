@@ -13,6 +13,7 @@ and Inngest functions.
 - `GET /api/health` — liveness + DB probe
 - `GET /api/docs` — Swagger UI · `GET /api/docs-json` — raw OpenAPI 3 spec
 - `POST /api/inngest` — Inngest webhook handler
+- `POST /api/mcp` — Model Context Protocol endpoint (Streamable HTTP)
 
 ## Layout
 
@@ -28,11 +29,16 @@ src/
   health/
     health.module.ts
     health.controller.ts
+    health.service.ts    # business logic, shared by controller + MCP tool
     dto/
       health-response.dto.ts
   inngest/
     client.ts            # singleton Inngest client
     functions/           # one file per function, aggregated by index.ts
+  mcp/
+    mcp.module.ts
+    mcp.service.ts       # builds an McpServer with all registered tools
+    mcp.controller.ts    # POST/GET/DELETE /api/mcp -> Streamable HTTP transport
 test/
   app.e2e-spec.ts        # supertest against a bootstrapped Nest app
   jest-e2e.json
@@ -84,10 +90,33 @@ Returns something like:
 - Swagger UI: <http://localhost:4000/api/docs>
 - Raw OpenAPI: <http://localhost:4000/api/docs-json>
 
-The JSON document is the contract used by generated clients and any agent
-tooling (MCP servers, codegen, etc.). Every new controller route MUST carry
-`@ApiTags`, `@ApiOperation` (with a stable `operationId`), and a typed
-`@ApiOkResponse({ type: SomeDto })` so it shows up in the spec.
+The JSON document is the contract used by generated clients. Every new
+controller route MUST carry `@ApiTags`, `@ApiOperation` (with a stable
+`operationId`), and a typed `@ApiOkResponse({ type: SomeDto })` so it shows
+up in the spec.
+
+## MCP
+
+Endpoint: `POST /api/mcp` (Model Context Protocol over Streamable HTTP,
+stateless — every request creates a fresh server + transport pair).
+
+Currently registered tools (see `src/mcp/mcp.service.ts`):
+
+- `getHealth` — wraps `HealthService.check()`; returns structured content.
+- `sendInngestEvent` — fires an Inngest event by name with optional payload.
+
+Adding a tool: register it inside `McpService.createServer()` next to the
+others. Tool handlers should call the matching NestJS service, never
+re-implement the logic. The contract is: **one service, two surfaces
+(HTTP + MCP).**
+
+Smoke-test from the CLI with the MCP inspector:
+
+```bash
+npx --yes @modelcontextprotocol/inspector \
+  --cli http://localhost:4000/api/mcp \
+  --method tools/list
+```
 
 ## Inngest (local dev)
 

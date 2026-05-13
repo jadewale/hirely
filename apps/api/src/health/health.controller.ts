@@ -1,13 +1,12 @@
-import { Controller, Get, Inject } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { sql } from 'drizzle-orm';
-import type { Database } from '../db';
 import { HealthResponseDto } from './dto/health-response.dto';
+import { HealthService } from './health.service';
 
 @ApiTags('health')
 @Controller('health')
 export class HealthController {
-  constructor(@Inject('DATABASE') private readonly db: Database) {}
+  constructor(private readonly health: HealthService) {}
 
   @Get()
   @ApiOperation({
@@ -19,20 +18,7 @@ export class HealthController {
       'without alerting on transient DB blips.',
   })
   @ApiOkResponse({ type: HealthResponseDto })
-  async check(): Promise<HealthResponseDto> {
-    let dbStatus: 'up' | 'down' = 'down';
-    try {
-      await this.db.execute(sql`select 1`);
-      dbStatus = 'up';
-    } catch {
-      dbStatus = 'down';
-    }
-
-    return {
-      status: dbStatus === 'up' ? 'ok' : 'degraded',
-      db: dbStatus,
-      uptime: process.uptime(),
-      timestamp: new Date().toISOString(),
-    };
+  check(): Promise<HealthResponseDto> {
+    return this.health.check();
   }
 }

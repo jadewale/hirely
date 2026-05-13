@@ -24,6 +24,7 @@ for "how do I work in this codebase".
 | DB           | Postgres + Drizzle ORM                                      |
 | Jobs         | Inngest (HTTP handler mounted at `/api/inngest`)            |
 | Docs         | `@nestjs/swagger` — UI at `/api/docs`, raw at `/api/docs-json` |
+| MCP          | `@modelcontextprotocol/sdk` mounted at `/api/mcp` (Streamable HTTP) |
 | Tests        | Jest (unit + e2e) via `ts-jest`                             |
 | Container    | Multi-stage Bun image; base images mirrored to ECR          |
 | Infra        | Terraform → ECS Fargate + RDS + ALB + ACM + Route53         |
@@ -44,6 +45,7 @@ Useful endpoints once running:
 - `GET  /api/docs` — Swagger UI
 - `GET  /api/docs-json` — raw OpenAPI 3 document
 - `POST /api/inngest` — Inngest webhook target (returns 401 without signature)
+- `POST /api/mcp` — Model Context Protocol endpoint (Streamable HTTP, stateless)
 
 ### Inngest dev server
 
@@ -95,12 +97,13 @@ All four must pass before merging. CI enforces this — see
 apps/api/src/
   main.ts                # process entry — just calls configureApp + listen
   bootstrap.ts           # shared wiring (prefix, body parser, Swagger, Inngest)
-  app.module.ts          # root NestJS module (ConfigModule, DbModule, HealthModule)
+  app.module.ts          # root NestJS module (Config, Db, Health, Mcp)
   db/                    # Drizzle client + schema
-  health/                # /api/health controller + DTO
+  health/                # /api/health: controller + service + DTO
   inngest/
     client.ts            # singleton Inngest client
     functions/           # one file per function, aggregated by index.ts
+  mcp/                   # /api/mcp: controller + service registering MCP tools
 apps/api/test/           # e2e tests (jest-e2e config)
 apps/api/Dockerfile      # multi-stage Bun build
 apps/api/taskdef.template.json   # canonical ECS task definition (envsubst'd in CI)
@@ -154,7 +157,21 @@ Anything you build that should be callable by an external agent must:
 
 1. Be reachable via the HTTP API and show up in `/api/docs-json`.
 2. Have a typed DTO for both input and response.
-3. Have at least one unit test and (if it touches the request lifecycle) one
-   e2e test.
+3. Have a corresponding MCP tool registered in `apps/api/src/mcp/mcp.service.ts`
+   so the agent surface stays in sync with the HTTP surface.
+4. Have at least one unit test on the service, and (if it touches the request
+   lifecycle) one e2e test on the controller AND one on the MCP tool.
 
-When in doubt, copy the pattern in `apps/api/src/health/`.
+When in doubt, copy the pattern in `apps/api/src/health/`:
+
+```
+health/
+  health.module.ts             # exports HealthService
+  health.service.ts            # business logic (no HTTP knowledge)
+  health.service.spec.ts       # unit test
+  health.controller.ts         # @ApiTags / @ApiOperation / @ApiOkResponse
+  dto/health-response.dto.ts   # @ApiProperty-decorated response shape
+```
+
+The controller and the MCP tool both delegate to the same service, so the
+two surfaces can't drift.
