@@ -318,6 +318,21 @@ resource "aws_codebuild_project" "api_deploy" {
       name  = "INNGEST_EVENT_KEY_ARN"
       value = aws_ssm_parameter.inngest_event_key.arn
     }
+
+    environment_variable {
+      name  = "RESEND_API_KEY_ARN"
+      value = aws_ssm_parameter.resend_api_key.arn
+    }
+
+    environment_variable {
+      name  = "EMAIL_PROVIDER"
+      value = var.email_provider
+    }
+
+    environment_variable {
+      name  = "EMAIL_FROM"
+      value = var.email_from
+    }
   }
 
   source {

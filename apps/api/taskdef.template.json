@@ -25,7 +25,9 @@
         { "name": "REDIS_PORT", "value": "6379" },
         { "name": "FRONTEND_URL", "value": "${FRONTEND_URL}" },
         { "name": "BETTER_AUTH_URL", "value": "${BETTER_AUTH_URL}" },
-        { "name": "GOOGLE_REDIRECT_URI", "value": "${GOOGLE_REDIRECT_URI}" }
+        { "name": "GOOGLE_REDIRECT_URI", "value": "${GOOGLE_REDIRECT_URI}" },
+        { "name": "EMAIL_PROVIDER", "value": "${EMAIL_PROVIDER}" },
+        { "name": "EMAIL_FROM", "value": "${EMAIL_FROM}" }
       ],
       "secrets": [
         { "name": "DATABASE_URL", "valueFrom": "${DATABASE_URL_ARN}" },
@@ -34,7 +36,8 @@
         { "name": "GOOGLE_CLIENT_SECRET", "valueFrom": "${GOOGLE_CLIENT_SECRET_ARN}" },
         { "name": "OPENAI_API_KEY", "valueFrom": "${OPENAI_API_KEY_ARN}" },
         { "name": "INNGEST_SIGNING_KEY", "valueFrom": "${INNGEST_SIGNING_KEY_ARN}" },
-        { "name": "INNGEST_EVENT_KEY", "valueFrom": "${INNGEST_EVENT_KEY_ARN}" }
+        { "name": "INNGEST_EVENT_KEY", "valueFrom": "${INNGEST_EVENT_KEY_ARN}" },
+        { "name": "RESEND_API_KEY", "valueFrom": "${RESEND_API_KEY_ARN}" }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",

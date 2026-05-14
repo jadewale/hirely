@@ -164,6 +164,25 @@ variable "inngest_event_key" {
   default     = ""
 }
 
+variable "resend_api_key" {
+  description = "Resend API key (used by ResendEmailProvider for transactional email)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "email_from" {
+  description = "Verified sender for transactional email, e.g. 'Hirely <noreply@mindoutreach.com>'"
+  type        = string
+  default     = "onboarding@mindoutreach.com"
+}
+
+variable "email_provider" {
+  description = "Which EmailProvider implementation to use at runtime: resend | ses | console"
+  type        = string
+  default     = "resend"
+}
+
 variable "github_repo" {
   description = "GitHub repository in owner/repo format"
   type        = string

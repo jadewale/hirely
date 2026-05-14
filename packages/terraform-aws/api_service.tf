@@ -96,6 +96,15 @@ resource "aws_ssm_parameter" "inngest_event_key" {
   tags = local.common_tags
 }
 
+resource "aws_ssm_parameter" "resend_api_key" {
+  name      = "/${local.name}/api/RESEND_API_KEY"
+  type      = "SecureString"
+  overwrite = true
+  value     = var.resend_api_key != "" ? var.resend_api_key : "unset"
+
+  tags = local.common_tags
+}
+
 resource "aws_iam_role" "ecs_execution" {
   name = "${local.name}-ecs-execution"
 
@@ -142,6 +151,7 @@ resource "aws_iam_role_policy" "ecs_execution_ssm" {
           aws_ssm_parameter.openai_api_key.arn,
           aws_ssm_parameter.inngest_signing_key.arn,
           aws_ssm_parameter.inngest_event_key.arn,
+          aws_ssm_parameter.resend_api_key.arn,
         ]
       },
       {
