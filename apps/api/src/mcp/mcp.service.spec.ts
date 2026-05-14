@@ -34,13 +34,18 @@ describe('McpService', () => {
     };
   };
 
-  it('exposes getHealth and sendInngestEvent tools', async () => {
+  it('exposes the expected tool surface', async () => {
     const mcp = await build();
     const { client, close } = await connectClient(mcp);
 
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
-    expect(names).toEqual(['getHealth', 'sendInngestEvent']);
+    expect(names).toEqual([
+      'getHealth',
+      'listInngestFunctions',
+      'markInboxConnected',
+      'markResumeUploaded',
+    ]);
 
     await close();
   });
@@ -53,6 +58,48 @@ describe('McpService', () => {
     expect(result.structuredContent).toMatchObject({
       status: 'ok',
       db: 'up',
+    });
+
+    await close();
+  });
+
+  it('listInngestFunctions returns id/name/triggers/cancelOn for every registered function', async () => {
+    const mcp = await build();
+    const { client, close } = await connectClient(mcp);
+
+    const result = await client.callTool({ name: 'listInngestFunctions' });
+    const payload = result.structuredContent as {
+      functions: Array<{
+        id: string;
+        name: string;
+        triggers: string[];
+        cancelOn: { event: string; if?: string }[];
+      }>;
+    };
+
+    const byId = Object.fromEntries(payload.functions.map((f) => [f.id, f]));
+
+    expect(byId['onboarding-welcome']).toMatchObject({
+      triggers: ['user/created'],
+      cancelOn: [],
+    });
+    expect(byId['onboarding-inbox-nudge']).toMatchObject({
+      triggers: ['user/created'],
+      cancelOn: [
+        {
+          event: 'integrations/inbox.connected',
+          if: 'async.data.userId == event.data.userId',
+        },
+      ],
+    });
+    expect(byId['onboarding-resume-nudge']).toMatchObject({
+      triggers: ['user/created'],
+      cancelOn: [
+        {
+          event: 'resumes/uploaded',
+          if: 'async.data.userId == event.data.userId',
+        },
+      ],
     });
 
     await close();

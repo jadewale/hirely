@@ -41,12 +41,17 @@ describe('MCP (e2e)', () => {
     return client;
   };
 
-  it('lists getHealth and sendInngestEvent tools', async () => {
+  it('lists the expected MCP tool surface', async () => {
     const client = await connect();
     try {
       const { tools } = await client.listTools();
       const names = tools.map((t) => t.name).sort();
-      expect(names).toEqual(['getHealth', 'sendInngestEvent']);
+      expect(names).toEqual([
+        'getHealth',
+        'listInngestFunctions',
+        'markInboxConnected',
+        'markResumeUploaded',
+      ]);
     } finally {
       await client.close();
     }

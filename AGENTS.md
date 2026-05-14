@@ -163,6 +163,11 @@ are in `apps/api/src/lib/auth.ts`; transactional templates are in
   MCP's stateless Streamable HTTP transport cannot carry. The "one
   service, two surfaces" rule still applies to your own domain features,
   just not to Better Auth's surface.
+- **MCP parity for onboarding events**: the events that cancel onboarding
+  nudges (`integrations/inbox.connected`, `resumes/uploaded`) are
+  exposed as `markInboxConnected` / `markResumeUploaded` tools in
+  `src/mcp/mcp.service.ts`. `user/created` is intentionally NOT exposed
+  — only Better Auth's `databaseHooks.user.create.after` may fire it.
 
 ## Onboarding emails (Inngest)
 
@@ -336,6 +341,8 @@ apps/api/src/
     onboarding-emails.ts # templates for welcome + nudges (rendered by Inngest functions)
     email-render.ts      # shared wrap()/button() chrome for every template
   mcp/                   # /api/mcp: controller + service registering MCP tools
+                         #   getHealth, listInngestFunctions,
+                         #   markInboxConnected, markResumeUploaded
 apps/api/drizzle/        # generated SQL migrations + drizzle-kit meta
 apps/api/test/           # e2e tests (jest-e2e config) — auth.e2e-spec.ts needs TEST_DATABASE_URL
 apps/api/Dockerfile      # multi-stage Bun build (copies drizzle/ into runner)
