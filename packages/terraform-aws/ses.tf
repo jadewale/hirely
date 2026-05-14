@@ -164,6 +164,21 @@ resource "aws_iam_role_policy" "ecs_task_ses" {
   name  = "${local.name}-ecs-task-ses"
   role  = aws_iam_role.ecs_task.id
 
+  # IMPORTANT: SES checks `ses:SendEmail` permission against *three* resource
+  # types in a single call:
+  #   1. the FROM identity (sender)
+  #   2. the configuration set (if used)
+  #   3. every destination identity, but ONLY when the recipient happens to be
+  #      a verified identity in this account. Sending to an unverified address
+  #      skips this check.
+  #
+  # We hit #3 the first time we sent to a gmail that was previously verified
+  # in the SES sandbox — SES denied with AccessDeniedException on
+  # `identity/<recipient>`. We add `identity/*` to the resource list so any
+  # destination is allowed, then scope the entire statement with
+  # `ses:FromAddress LIKE *@<our domain>` so a leaked task role still can't
+  # spoof a send from another verified identity.
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -175,13 +190,16 @@ resource "aws_iam_role_policy" "ecs_task_ses" {
           "ses:SendEmail",
           "ses:SendRawEmail",
         ]
-        # Restrict to our verified identity AND to traffic going through
-        # our configuration set so a leaked task role can't be used to
-        # send from arbitrary identities or bypass bounce capture.
         Resource = [
           aws_sesv2_email_identity.mail_domain[0].arn,
           "arn:aws:ses:${var.aws_region}:${data.aws_caller_identity.current.account_id}:configuration-set/${aws_sesv2_configuration_set.email[0].configuration_set_name}",
+          "arn:aws:ses:${var.aws_region}:${data.aws_caller_identity.current.account_id}:identity/*",
         ]
+        Condition = {
+          StringLike = {
+            "ses:FromAddress" = "*@${var.ses_mail_domain}"
+          }
+        }
       },
     ]
   })
