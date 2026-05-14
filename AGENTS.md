@@ -25,6 +25,7 @@ for "how do I work in this codebase".
 | Jobs         | Inngest (HTTP handler mounted at `/api/inngest`)            |
 | Docs         | `@nestjs/swagger` — UI at `/api/docs`, raw at `/api/docs-json` |
 | MCP          | `@modelcontextprotocol/sdk` mounted at `/api/mcp` (Streamable HTTP) |
+| Email        | `EmailProvider` adapter — Resend / SES / Console behind one interface |
 | Tests        | Jest (unit + e2e) via `ts-jest`                             |
 | Container    | Multi-stage Bun image; base images mirrored to ECR          |
 | Infra        | Terraform → ECS Fargate + RDS + ALB + ACM + Route53         |
@@ -74,6 +75,21 @@ bun run test:e2e    # supertest against bootstrapped Nest app
 
 All four must pass before merging. CI enforces this — see
 `.github/workflows/ci.yml`.
+
+## Email
+
+All transactional email goes through `EmailProvider` (injection token
+`EMAIL_PROVIDER`) in `apps/api/src/email/`. Never call Resend, SES, or
+fetch an email API directly from feature code — inject the provider:
+
+```typescript
+constructor(@Inject(EMAIL_PROVIDER) private email: EmailProvider) {}
+```
+
+Pick the implementation with `EMAIL_PROVIDER=resend|ses|console`. `console`
+is the default and logs to stdout (use it in tests and local dev). The
+`ses` adapter is a stub that throws at boot — implement before switching
+to it.
 
 ## Conventions
 
