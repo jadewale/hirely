@@ -11,22 +11,21 @@
  *   - Observability — runs show up in the Inngest dashboard with payload,
  *     status, and replay support.
  */
-import { getEmailProvider } from '../../email/email.factory';
-import { welcomeEmail } from '../../lib/onboarding-emails';
-import { inngest } from '../client';
-import { userCreated } from '../events';
-
-const emailFrom = (): string =>
-  process.env.EMAIL_FROM ?? 'Hirely <onboarding@mindoutreach.com>';
+import { getEmailProvider } from '../../../email/email.factory';
+import { welcomeEmail } from '../../../lib/onboarding-emails';
+import { inngest } from '../../client';
+import { userCreated } from '../../events';
+import { ONBOARDING_WELCOME } from './consts';
+import { emailFrom } from './utils';
 
 export const onboardingWelcome = inngest.createFunction(
   {
-    id: 'onboarding-welcome',
-    name: 'Onboarding: welcome email',
+    id: ONBOARDING_WELCOME.id,
+    name: ONBOARDING_WELCOME.name,
     triggers: [{ event: userCreated }],
   },
   async ({ event, step }) => {
-    await step.run('send-welcome-email', async () => {
+    await step.run(ONBOARDING_WELCOME.steps.send, async () => {
       const provider = getEmailProvider();
       const tpl = welcomeEmail(event.data.name);
       return provider.sendEmail({

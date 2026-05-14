@@ -202,11 +202,17 @@ though the user already completed the action.
 
 1. Add the cancel-event to `apps/api/src/inngest/events.ts` (include
    `data.userId` so `cancelOn` can match).
-2. Create `apps/api/src/inngest/functions/onboarding-<name>.ts`
-   following the inbox/resume pattern (`step.sleep` → `step.run`).
-3. Wire it into `apps/api/src/inngest/functions/index.ts`.
-4. Add an email template to `apps/api/src/lib/onboarding-emails.ts`.
-5. Update the feature code that completes the action to emit the
+2. Add an `ONBOARDING_<NAME>_NUDGE` constant to
+   `apps/api/src/inngest/functions/onboarding/consts.ts` with `id`,
+   `name`, and `steps.{sleep,send}` keys.
+3. Create `apps/api/src/inngest/functions/onboarding/<name>-nudge.ts`
+   following the inbox/resume pattern (`step.sleep` → `step.run`),
+   referencing the consts and `MATCH_USER_ID_EXPR`.
+4. Re-export the new function from
+   `apps/api/src/inngest/functions/onboarding/index.ts`, then add it to
+   the registry array in `apps/api/src/inngest/functions/index.ts`.
+5. Add an email template to `apps/api/src/lib/onboarding-emails.ts`.
+6. Update the feature code that completes the action to emit the
    cancel-event.
 
 Tune the delay locally with `ONBOARDING_NUDGE_DELAY=30s` to exercise
@@ -313,10 +319,17 @@ apps/api/src/
   inngest/
     client.ts            # singleton Inngest client (typed via events.ts)
     events.ts            # typed event catalog — every send + cancelOn references it
-    functions/           # one file per function, aggregated by index.ts
-      onboarding-welcome.ts        # sends welcome email on user/created
-      onboarding-inbox-nudge.ts    # 5d nudge, cancelOn integrations/inbox.connected
-      onboarding-resume-nudge.ts   # 5d nudge, cancelOn resumes/uploaded
+    functions/
+      index.ts           # registry array — every function lands here
+      hello-world.ts     # smoke / demo function
+      onboarding/        # post-signup email sequence (welcome + nudges)
+        index.ts         # barrel — re-exports functions + consts
+        consts.ts        # ids, names, step ids, MATCH_USER_ID_EXPR, delay default
+        utils.ts         # shared helpers (emailFrom, nudgeDelay)
+        welcome.ts       # sends welcome email on user/created
+        inbox-nudge.ts   # 5d nudge, cancelOn integrations/inbox.connected
+        resume-nudge.ts  # 5d nudge, cancelOn resumes/uploaded
+        onboarding.spec.ts
   lib/
     auth.ts              # Better Auth instance — source of truth for /api/auth/*
     auth-emails.ts       # templates for verify + reset (Better Auth's direct callbacks)

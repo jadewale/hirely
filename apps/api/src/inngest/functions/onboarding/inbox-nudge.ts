@@ -15,36 +15,29 @@
  * Tunable via `ONBOARDING_NUDGE_DELAY` (default 5d). Use a small value like
  * `30s` in dev/staging to exercise the path end-to-end without waiting.
  */
-import { getEmailProvider } from '../../email/email.factory';
-import { inboxNudgeEmail } from '../../lib/onboarding-emails';
-import { inngest } from '../client';
-import { integrationsInboxConnected, userCreated } from '../events';
-
-const emailFrom = (): string =>
-  process.env.EMAIL_FROM ?? 'Hirely <onboarding@mindoutreach.com>';
-
-const nudgeDelay = (): string => process.env.ONBOARDING_NUDGE_DELAY ?? '5d';
+import { getEmailProvider } from '../../../email/email.factory';
+import { inboxNudgeEmail } from '../../../lib/onboarding-emails';
+import { inngest } from '../../client';
+import { integrationsInboxConnected, userCreated } from '../../events';
+import { MATCH_USER_ID_EXPR, ONBOARDING_INBOX_NUDGE } from './consts';
+import { emailFrom, nudgeDelay } from './utils';
 
 export const onboardingInboxNudge = inngest.createFunction(
   {
-    id: 'onboarding-inbox-nudge',
-    name: 'Onboarding: inbox connection nudge',
+    id: ONBOARDING_INBOX_NUDGE.id,
+    name: ONBOARDING_INBOX_NUDGE.name,
     triggers: [{ event: userCreated }],
     cancelOn: [
       {
         event: integrationsInboxConnected,
-        // CEL expression — cancel only if the cancel event's userId matches
-        // the userId from this run's triggering `user/created` event. Without
-        // this, ANY user connecting their inbox would cancel every pending
-        // nudge for every other user.
-        if: 'async.data.userId == event.data.userId',
+        if: MATCH_USER_ID_EXPR,
       },
     ],
   },
   async ({ event, step }) => {
-    await step.sleep('wait-before-nudge', nudgeDelay());
+    await step.sleep(ONBOARDING_INBOX_NUDGE.steps.sleep, nudgeDelay());
 
-    await step.run('send-inbox-nudge', async () => {
+    await step.run(ONBOARDING_INBOX_NUDGE.steps.send, async () => {
       const provider = getEmailProvider();
       const tpl = inboxNudgeEmail(event.data.name);
       return provider.sendEmail({

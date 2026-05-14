@@ -9,32 +9,29 @@
  * delay; that's intentionally OK because right now the people in the
  * system ARE the ones we want to nudge.
  */
-import { getEmailProvider } from '../../email/email.factory';
-import { resumeNudgeEmail } from '../../lib/onboarding-emails';
-import { inngest } from '../client';
-import { resumesUploaded, userCreated } from '../events';
-
-const emailFrom = (): string =>
-  process.env.EMAIL_FROM ?? 'Hirely <onboarding@mindoutreach.com>';
-
-const nudgeDelay = (): string => process.env.ONBOARDING_NUDGE_DELAY ?? '5d';
+import { getEmailProvider } from '../../../email/email.factory';
+import { resumeNudgeEmail } from '../../../lib/onboarding-emails';
+import { inngest } from '../../client';
+import { resumesUploaded, userCreated } from '../../events';
+import { MATCH_USER_ID_EXPR, ONBOARDING_RESUME_NUDGE } from './consts';
+import { emailFrom, nudgeDelay } from './utils';
 
 export const onboardingResumeNudge = inngest.createFunction(
   {
-    id: 'onboarding-resume-nudge',
-    name: 'Onboarding: resume upload nudge',
+    id: ONBOARDING_RESUME_NUDGE.id,
+    name: ONBOARDING_RESUME_NUDGE.name,
     triggers: [{ event: userCreated }],
     cancelOn: [
       {
         event: resumesUploaded,
-        if: 'async.data.userId == event.data.userId',
+        if: MATCH_USER_ID_EXPR,
       },
     ],
   },
   async ({ event, step }) => {
-    await step.sleep('wait-before-nudge', nudgeDelay());
+    await step.sleep(ONBOARDING_RESUME_NUDGE.steps.sleep, nudgeDelay());
 
-    await step.run('send-resume-nudge', async () => {
+    await step.run(ONBOARDING_RESUME_NUDGE.steps.send, async () => {
       const provider = getEmailProvider();
       const tpl = resumeNudgeEmail(event.data.name);
       return provider.sendEmail({

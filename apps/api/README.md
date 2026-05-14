@@ -48,8 +48,15 @@ src/
   inngest/
     client.ts            # singleton Inngest client
     events.ts            # typed event catalog (eventType + staticSchema)
-    functions/           # one file per function, aggregated by index.ts
-                         #   onboarding-welcome / -inbox-nudge / -resume-nudge
+    functions/
+      index.ts           # registry array picked up by serve()
+      hello-world.ts
+      onboarding/        # welcome + nudges (one source of truth in consts.ts)
+        consts.ts        # ids, names, step ids, cancel predicate, delay default
+        utils.ts         # emailFrom() + nudgeDelay() helpers
+        welcome.ts
+        inbox-nudge.ts
+        resume-nudge.ts
   lib/
     auth.ts              # Better Auth instance — source of truth for /api/auth/*
     auth-emails.ts       # templates for verify + reset
