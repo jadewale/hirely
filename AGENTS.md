@@ -25,6 +25,7 @@ for "how do I work in this codebase".
 | Jobs         | Inngest (HTTP handler mounted at `/api/inngest`)            |
 | Docs         | `@nestjs/swagger` — UI at `/api/docs`, raw at `/api/docs-json` |
 | MCP          | `@modelcontextprotocol/sdk` mounted at `/api/mcp` (Streamable HTTP) |
+| Auth         | Better Auth (email/password + Google) via `@thallesp/nestjs-better-auth` |
 | HTTP         | `HttpClient` adapter — Fetch (default) / Axios (stub) behind one interface |
 | Email        | `EmailProvider` adapter — Resend / SES / Console behind one interface |
 | Tests        | Jest (unit + e2e) via `@swc/jest` (handles ESM-only deps)   |
@@ -48,6 +49,7 @@ Useful endpoints once running:
 - `GET  /api/docs-json` — raw OpenAPI 3 document
 - `POST /api/inngest` — Inngest webhook target (returns 401 without signature)
 - `POST /api/mcp` — Model Context Protocol endpoint (Streamable HTTP, stateless)
+- `*    /api/auth/*` — Better Auth routes (sign-up, sign-in, session, OAuth callback)
 
 ### Inngest dev server
 
@@ -107,6 +109,44 @@ is the default and logs to stdout (use it in tests and local dev). The
 `ses` adapter is a stub that throws at boot — implement before switching
 to it.
 
+Better Auth's verify / reset / welcome callbacks also use `EmailProvider`,
+but they go through the plain factory in `src/email/email.factory.ts`
+instead of Nest DI (Better Auth's instance is constructed at module-load
+time, before DI exists). Keep the factory and the Nest provider in sync.
+
+## Auth
+
+Better Auth lives at `/api/auth/*` and is wired in via
+`@thallesp/nestjs-better-auth`. Its instance and email-callback wiring
+are in `apps/api/src/lib/auth.ts`; transactional templates are in
+`apps/api/src/lib/auth-emails.ts`. The Drizzle tables Better Auth needs
+(`user`, `session`, `account`, `verification`) live in
+`apps/api/src/db/schema/auth.ts` and are CLI-generated — see the
+[Database](#database-drizzle) section.
+
+### Rules
+
+- **Anonymous endpoints**: a global guard requires a session on every
+  route. Endpoints that must be reachable without auth (`/api/health`,
+  `/api/mcp`, Inngest's webhook) carry `@AllowAnonymous()` from
+  `@thallesp/nestjs-better-auth`. Forgetting this on a new public route
+  gives a confusing 401 in CI — check the controller first.
+- **Body parsing**: `main.ts` boots Nest with `bodyParser: false`. The
+  `AuthModule` reinstalls JSON + urlencoded parsers for non-auth routes
+  AND keeps the raw body for `/api/auth/*` so Better Auth can read it.
+  Do NOT call `app.useBodyParser('json')` from `bootstrap.ts` or
+  `main.ts` — it shadows that wiring.
+- **Required env vars**: `BETTER_AUTH_SECRET` (rotate = invalidate every
+  session) and `BETTER_AUTH_URL` (must match an Authorized redirect URI
+  in Google OAuth). `GOOGLE_CLIENT_ID`/`SECRET` are optional — when unset
+  Better Auth silently drops the Google provider so local dev boots
+  cleanly.
+- **No MCP parity for auth**: sign-up, sign-in, password reset, and the
+  OAuth callback are user-initiated and depend on session cookies that
+  MCP's stateless Streamable HTTP transport cannot carry. The "one
+  service, two surfaces" rule still applies to your own domain features,
+  just not to Better Auth's surface.
+
 ## Database (Drizzle)
 
 Schema lives in `apps/api/src/db/schema/<domain>.ts`, one file per domain,
@@ -115,12 +155,32 @@ new domain files are picked up with zero config.
 
 ```
 apps/api/src/db/
-├── index.ts                  # Drizzle client (postgres-js) + Database type
+├── index.ts                  # postgres-js pool + Drizzle client + Database type
+├── db.module.ts              # @Global module exposing "DATABASE" + closes pool on shutdown
 ├── migrator.ts               # startup migrator; runs from main.ts before listen()
 └── schema/
     ├── index.ts              # barrel — `export * from './<domain>'` per new file
     └── auth.ts               # Better Auth tables (CLI-owned, do not hand-edit)
 ```
+
+### Pool tuning
+
+`postgres-js` maintains a connection pool per process. We expose its
+key knobs via env vars so they can be tuned per-environment without a
+code deploy. Total RDS connections in use = `PG_POOL_MAX * ECS tasks`,
+so size this against your RDS instance class (e.g. `db.t3.micro` ≈ 85
+max).
+
+| Env var              | Default | Notes                                                     |
+| -------------------- | ------- | --------------------------------------------------------- |
+| `PG_POOL_MAX`        | `10`    | Max simultaneous connections per process                  |
+| `PG_IDLE_TIMEOUT`    | `30`    | Seconds before an idle pooled connection closes           |
+| `PG_CONNECT_TIMEOUT` | `10`    | Seconds to wait acquiring a new connection                |
+| `PG_PREPARE`         | (on)    | Set `0` if running behind PgBouncer in transaction-pooling mode |
+
+The pool drains cleanly on SIGTERM (ECS) and on `app.close()` (tests) via
+`DbModule.onApplicationShutdown`, enabled by `app.enableShutdownHooks()`
+in `bootstrap.ts`.
 
 ### Rules
 
@@ -168,24 +228,32 @@ apps/api/src/db/
 ```
 apps/api/src/
   main.ts                # entry — runs migrations, creates Nest app, listens
-  bootstrap.ts           # shared wiring (prefix, Swagger, Inngest mount)
+  bootstrap.ts           # shared wiring (prefix, shutdown hooks, Swagger, Inngest mount)
   app.module.ts          # root NestJS module (Config, Auth, Db, Http, Email, Health, Mcp)
   db/
-    index.ts             # Drizzle client + Database type
+    index.ts             # postgres-js pool + Drizzle client + Database type
+    db.module.ts         # exposes DATABASE provider + drains pool on shutdown
     migrator.ts          # runtime migrator — runs before app.listen()
     schema/              # one file per domain + barrel index.ts
       auth.ts            # Better Auth tables (CLI-owned, do not hand-edit)
-  email/                 # EmailProvider adapter (interface + impls + factory)
+  email/
+    email.module.ts      # Nest provider for EMAIL_PROVIDER
+    email.factory.ts     # plain factory used by both EmailModule AND lib/auth.ts
+    providers/           # console | resend | ses implementations
   health/                # /api/health: controller + service + DTO
-  http/                  # HttpClient adapter (interface + impls + factory)
+  http/
+    http.module.ts       # Nest provider for HTTP_CLIENT
+    http.factory.ts      # plain factory used by both HttpModule AND lib/auth.ts
+    clients/             # fetch | axios implementations
   inngest/
     client.ts            # singleton Inngest client
     functions/           # one file per function, aggregated by index.ts
   lib/
     auth.ts              # Better Auth instance — source of truth for /api/auth/*
+    auth-emails.ts       # HTML+text templates for verify / reset / welcome
   mcp/                   # /api/mcp: controller + service registering MCP tools
 apps/api/drizzle/        # generated SQL migrations + drizzle-kit meta
-apps/api/test/           # e2e tests (jest-e2e config)
+apps/api/test/           # e2e tests (jest-e2e config) — auth.e2e-spec.ts needs TEST_DATABASE_URL
 apps/api/Dockerfile      # multi-stage Bun build (copies drizzle/ into runner)
 apps/api/taskdef.template.json   # canonical ECS task definition (envsubst'd in CI)
 apps/api/docker-compose.yml      # local Postgres for `bun run dev`

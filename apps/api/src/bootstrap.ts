@@ -14,6 +14,10 @@ import { functions as inngestFunctions } from './inngest/functions';
 export function configureApp(app: NestExpressApplication): void {
   app.setGlobalPrefix('api');
 
+  // Enables OnApplicationShutdown hooks (used by DbModule to close the
+  // postgres pool on SIGTERM/SIGINT and on app.close() in tests).
+  app.enableShutdownHooks();
+
   // Body parsing is handled by @thallesp/nestjs-better-auth's AuthModule:
   // JSON and urlencoded parsers are installed for every non-auth route, and
   // the raw body is preserved for /api/auth/* so Better Auth can read it.
