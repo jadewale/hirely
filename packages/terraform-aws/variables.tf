@@ -71,13 +71,19 @@ variable "api_health_check_path" {
 }
 
 variable "frontend_url" {
-  description = "Allowed frontend origin for API CORS"
+  description = <<-EOT
+    Comma-separated list of allowed frontend origins. Drives both the API's
+    CORS allowlist (Access-Control-Allow-Origin) and Better Auth's
+    `trustedOrigins` list. Use a single value for dev (e.g.
+    `http://localhost:3000`) and a comma-separated list for prod
+    (e.g. `https://app.mindoutreach.com,https://www.mindoutreach.com`).
+  EOT
   type        = string
   default     = "http://localhost:3000"
 }
 
 variable "route53_zone_id" {
-  description = "Optional Route53 hosted zone ID for the API domain"
+  description = "Optional Route53 hosted zone ID for the API + web domains"
   type        = string
   default     = null
   nullable    = true
@@ -88,6 +94,29 @@ variable "api_domain_name" {
   type        = string
   default     = null
   nullable    = true
+}
+
+variable "web_domain_name" {
+  description = <<-EOT
+    Optional custom domain for the web client hosted on Vercel
+    (e.g. app.mindoutreach.com). When set together with `route53_zone_id`,
+    Terraform creates a CNAME pointing at Vercel's edge so the cert + TLS
+    handshake happen on Vercel's side -- AWS only owns the DNS record.
+  EOT
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "vercel_dns_target" {
+  description = <<-EOT
+    The hostname Vercel asks you to CNAME your custom domain at. Default
+    works for hobby + standard pro accounts; enterprise contracts may issue
+    a dedicated edge hostname (e.g. `<id>.vercel-dns-XXX.com`) which you
+    pass in here. Surfaced by Vercel under Project -> Settings -> Domains.
+  EOT
+  type        = string
+  default     = "cname.vercel-dns.com"
 }
 
 variable "db_name" {

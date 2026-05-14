@@ -2,12 +2,16 @@ aws_region               = "us-east-1"
 project_name             = "hirely"
 environment              = "prod"
 
-# Your frontend URL (where the Next.js web app is hosted)
-frontend_url             = "https://hirely.com"
+# Allowed web origins (comma-separated). Drives BOTH the API's CORS
+# allowlist AND Better Auth's trustedOrigins. Example with multiple
+# environments: "https://app.hirely.com,http://localhost:3000"
+frontend_url             = "https://app.hirely.com"
 
-# Domain — Route53 hosted zone + custom subdomain for the API
+# Domains. The API lives in this AWS account (ALB + ACM); the web client
+# is hosted on Vercel and we only own its DNS record here.
 # route53_zone_id        = "Z0123456789ABCDEFGHIJ"
 # api_domain_name        = "api.hirely.com"
+# web_domain_name        = "app.hirely.com"
 
 # Container settings
 api_image_tag            = "latest"
