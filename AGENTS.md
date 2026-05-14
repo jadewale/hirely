@@ -25,6 +25,7 @@ for "how do I work in this codebase".
 | Jobs         | Inngest (HTTP handler mounted at `/api/inngest`)            |
 | Docs         | `@nestjs/swagger` — UI at `/api/docs`, raw at `/api/docs-json` |
 | MCP          | `@modelcontextprotocol/sdk` mounted at `/api/mcp` (Streamable HTTP) |
+| HTTP         | `HttpClient` adapter — Fetch (default) / Axios (stub) behind one interface |
 | Email        | `EmailProvider` adapter — Resend / SES / Console behind one interface |
 | Tests        | Jest (unit + e2e) via `ts-jest`                             |
 | Container    | Multi-stage Bun image; base images mirrored to ECR          |
@@ -75,6 +76,21 @@ bun run test:e2e    # supertest against bootstrapped Nest app
 
 All four must pass before merging. CI enforces this — see
 `.github/workflows/ci.yml`.
+
+## HTTP
+
+All outbound HTTP requests go through `HttpClient` (injection token
+`HTTP_CLIENT`) in `apps/api/src/http/`. Never call `fetch` or `axios`
+directly from feature code — inject the client:
+
+```typescript
+constructor(@Inject(HTTP_CLIENT) private http: HttpClient) {}
+```
+
+Pick the implementation with `HTTP_CLIENT=fetch|axios`. `fetch` is the
+default (uses `globalThis.fetch`, no extra deps). The `axios` adapter is
+a stub that throws at boot — `bun add axios` and replace the stub body
+before switching to it.
 
 ## Email
 

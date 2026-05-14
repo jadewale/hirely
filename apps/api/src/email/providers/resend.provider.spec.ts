@@ -1,7 +1,27 @@
+import type { HttpClient, HttpResponse } from '../../http/http-client';
 import { ResendEmailProvider } from './resend.provider';
 
+const okResponse = <T>(data: T): HttpResponse<T> => ({
+  status: 200,
+  ok: true,
+  headers: {},
+  data,
+  rawText: JSON.stringify(data),
+});
+
+const errResponse = (status: number, text: string): HttpResponse<never> => ({
+  status,
+  ok: false,
+  headers: {},
+  data: null,
+  rawText: text,
+});
+
+const buildHttp = (
+  impl: (url: string, init?: unknown) => Promise<HttpResponse<unknown>>,
+): HttpClient => ({ request: impl as unknown as HttpClient['request'] });
+
 describe('ResendEmailProvider', () => {
-  const originalFetch = global.fetch;
   const originalKey = process.env.RESEND_API_KEY;
 
   beforeAll(() => {
@@ -9,19 +29,15 @@ describe('ResendEmailProvider', () => {
   });
   afterAll(() => {
     process.env.RESEND_API_KEY = originalKey;
-    global.fetch = originalFetch;
   });
 
-  it('POSTs to Resend with auth header and JSON body', async () => {
-    const fetchMock = jest.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({ id: 'em_42' }),
-      } as unknown as Response),
+  it('POSTs to Resend through the injected HttpClient', async () => {
+    const requestMock = jest.fn(() =>
+      Promise.resolve(okResponse({ id: 'em_42' })),
     );
-    global.fetch = fetchMock;
+    const http = buildHttp(requestMock);
 
-    const p = new ResendEmailProvider();
+    const p = new ResendEmailProvider(http);
     const result = await p.sendEmail({
       to: 'x@example.com',
       from: 'noreply@hirely.io',
@@ -30,28 +46,27 @@ describe('ResendEmailProvider', () => {
     });
 
     expect(result.id).toBe('em_42');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(requestMock).toHaveBeenCalledTimes(1);
+    const [url, init] = requestMock.mock.calls[0];
     expect(url).toBe('https://api.resend.com/emails');
-    expect(init.method).toBe('POST');
-    const headers = init.headers as Record<string, string>;
-    expect(headers.Authorization).toBe('Bearer test_key_123');
-    expect(JSON.parse(init.body as string)).toMatchObject({
+    const requestInit = init as {
+      method: string;
+      headers: Record<string, string>;
+      body: { to: string; subject: string };
+    };
+    expect(requestInit.method).toBe('POST');
+    expect(requestInit.headers.Authorization).toBe('Bearer test_key_123');
+    expect(requestInit.body).toMatchObject({
       to: 'x@example.com',
       subject: 'hi',
     });
   });
 
   it('throws when Resend returns non-200', async () => {
-    global.fetch = jest.fn(() =>
-      Promise.resolve({
-        ok: false,
-        status: 422,
-        text: () => Promise.resolve('invalid_from'),
-      } as unknown as Response),
+    const http = buildHttp(
+      jest.fn(() => Promise.resolve(errResponse(422, 'invalid_from'))),
     );
-
-    const p = new ResendEmailProvider();
+    const p = new ResendEmailProvider(http);
     await expect(
       p.sendEmail({
         to: 'x@example.com',
@@ -64,7 +79,8 @@ describe('ResendEmailProvider', () => {
 
   it('boot fails if RESEND_API_KEY is missing', () => {
     delete process.env.RESEND_API_KEY;
-    expect(() => new ResendEmailProvider()).toThrow(/RESEND_API_KEY/);
+    const http = buildHttp(jest.fn());
+    expect(() => new ResendEmailProvider(http)).toThrow(/RESEND_API_KEY/);
     process.env.RESEND_API_KEY = 'test_key_123';
   });
 });
