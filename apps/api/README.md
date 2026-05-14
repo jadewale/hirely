@@ -11,7 +11,8 @@ and Inngest functions.
 - NestJS HTTP server (Express adapter)
 - Postgres connection via Drizzle ORM (auto-migrating at boot)
 - Better Auth at `/api/auth/*` — email/password + Google OAuth, with verify
-  / password-reset / welcome emails wired through `EmailProvider`
+  / password-reset / welcome emails wired through `EmailProvider` (SES in
+  prod, Resend as a swap-in fallback)
 - `GET /api/health` — liveness + DB probe
 - `GET /api/docs` — Swagger UI · `GET /api/docs-json` — raw OpenAPI 3 spec
 - `POST /api/inngest` — Inngest webhook handler
@@ -219,9 +220,11 @@ curl -i -X POST http://localhost:4000/api/auth/sign-up/email \
 | `FRONTEND_URL`         | Trusted origin for the SPA; redirect target after OAuth           |
 | `GOOGLE_CLIENT_ID`     | Optional. Unset / `unset` disables the Google provider            |
 | `GOOGLE_CLIENT_SECRET` | Optional. Paired with the client ID                               |
-| `EMAIL_PROVIDER`       | `resend` \| `ses` \| `console` (default `console`)                |
+| `EMAIL_PROVIDER`       | `ses` \| `resend` \| `console` (default `console` locally, `ses` in prod) |
 | `EMAIL_FROM`           | Verified sender, e.g. `"Hirely <onboarding@hirely.io>"`           |
-| `RESEND_API_KEY`       | Required when `EMAIL_PROVIDER=resend`                             |
+| `SES_CONFIGURATION_SET`| Optional. Routes SES sends through a config set so bounce/complaint events flow to SNS |
+| `AWS_REGION`           | Required when `EMAIL_PROVIDER=ses` (auto-injected by ECS in prod) |
+| `RESEND_API_KEY`       | Required only when `EMAIL_PROVIDER=resend`                        |
 | `HTTP_CLIENT`          | `fetch` \| `axios` (default `fetch`)                              |
 | `INNGEST_DEV`          | `1` to run Inngest in dev mode (skip signing-key check)           |
 | `INNGEST_EVENT_KEY`    | Production: signs events sent to Inngest Cloud                    |

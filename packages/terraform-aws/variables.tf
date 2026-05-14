@@ -180,7 +180,20 @@ variable "email_from" {
 variable "email_provider" {
   description = "Which EmailProvider implementation to use at runtime: resend | ses | console"
   type        = string
-  default     = "resend"
+  default     = "ses"
+}
+
+variable "ses_mail_domain" {
+  description = "Sender domain to verify in SES via DKIM, e.g. \"mindoutreach.com\". Set to null to skip provisioning SES resources entirely (useful if running EMAIL_PROVIDER=resend or =console)."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "ses_create_dmarc_record" {
+  description = "Create a _dmarc TXT record with a p=none monitoring-only policy. Disable if you already manage DMARC outside of this module."
+  type        = bool
+  default     = true
 }
 
 variable "github_repo" {

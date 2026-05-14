@@ -27,7 +27,7 @@ for "how do I work in this codebase".
 | MCP          | `@modelcontextprotocol/sdk` mounted at `/api/mcp` (Streamable HTTP) |
 | Auth         | Better Auth (email/password + Google) via `@thallesp/nestjs-better-auth` |
 | HTTP         | `HttpClient` adapter — Fetch (default) / Axios (stub) behind one interface |
-| Email        | `EmailProvider` adapter — Resend / SES / Console behind one interface |
+| Email        | `EmailProvider` adapter — SES (default) / Resend / Console behind one interface |
 | Tests        | Jest (unit + e2e) via `@swc/jest` (handles ESM-only deps)   |
 | Container    | Multi-stage Bun image; base images mirrored to ECR          |
 | Infra        | Terraform → ECS Fargate + RDS + ALB + ACM + Route53         |
@@ -97,17 +97,33 @@ before switching to it.
 ## Email
 
 All transactional email goes through `EmailProvider` (injection token
-`EMAIL_PROVIDER`) in `apps/api/src/email/`. Never call Resend, SES, or
+`EMAIL_PROVIDER`) in `apps/api/src/email/`. Never call SES, Resend, or
 fetch an email API directly from feature code — inject the provider:
 
 ```typescript
 constructor(@Inject(EMAIL_PROVIDER) private email: EmailProvider) {}
 ```
 
-Pick the implementation with `EMAIL_PROVIDER=resend|ses|console`. `console`
-is the default and logs to stdout (use it in tests and local dev). The
-`ses` adapter is a stub that throws at boot — implement before switching
-to it.
+Pick the implementation with `EMAIL_PROVIDER=ses|resend|console`. `console`
+is the default for local dev (logs to stdout). `ses` is the default in
+prod (signs requests via the ECS task role — no API key in SSM). `resend`
+is kept around as a swap-in fallback; the API key still lives in SSM so
+flipping back is a one-line change.
+
+### SES (production)
+
+- Identity, DKIM CNAMEs, configuration set, and bounce/complaint SNS
+  topic are owned by Terraform in `packages/terraform-aws/ses.tf`.
+- The ECS task role has `ses:SendEmail` scoped to the identity AND the
+  configuration set (`packages/terraform-aws/ses.tf` → `aws_iam_role_policy.ecs_task_ses`).
+- `SES_CONFIGURATION_SET` env var routes every send through the config
+  set so bounce/complaint events flow to `aws_sns_topic.ses_events`.
+  Subscribe a Lambda/SQS consumer to that topic when you build a real
+  bounce handler.
+- A fresh AWS account lands in the SES sandbox (200/day, verified
+  recipients only). After the first `terraform apply` you must click
+  "Request production access" in the SES console — this step is **not**
+  Terraformable.
 
 Better Auth's verify / reset / welcome callbacks also use `EmailProvider`,
 but they go through the plain factory in `src/email/email.factory.ts`

@@ -51,5 +51,12 @@ alwaysApply: false
   cookies, which MCP's stateless Streamable HTTP transport cannot carry.
   The "one service, two surfaces" rule applies to first-party domain
   features, not to Better Auth's surface.
+- Transactional email defaults to AWS SES via `SesEmailProvider`. SES
+  signs requests with the ECS task role — there's no API key in SSM.
+  Resend (`ResendEmailProvider`) stays in tree as a swap-in fallback;
+  `RESEND_API_KEY` remains in SSM. To flip providers per-environment
+  set `EMAIL_PROVIDER=ses|resend|console`. Bounce/complaint telemetry
+  lives behind the SES configuration set (`SES_CONFIGURATION_SET` env
+  var) → SNS topic owned in `packages/terraform-aws/ses.tf`.
 - Do NOT add code comments that narrate what the code does. Comments are for
   non-obvious intent, trade-offs, or constraints.

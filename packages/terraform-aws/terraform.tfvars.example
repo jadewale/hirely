@@ -30,6 +30,12 @@ google_client_id         = "your-google-client-id.apps.googleusercontent.com"
 google_client_secret     = "your-google-client-secret"
 openai_api_key           = "sk-your-openai-api-key"
 
+# Email
+# email_provider          = "ses"   # default; alternatives: resend | console
+# email_from              = "Hirely <noreply@hirely.com>"
+# ses_mail_domain         = "hirely.com"   # null/omit to skip SES provisioning
+# resend_api_key          = ""              # only needed if email_provider="resend"
+
 # CI/CD
 github_repo              = "jadewale/hirely"
 github_branch            = "main"

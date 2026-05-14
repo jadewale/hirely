@@ -333,6 +333,11 @@ resource "aws_codebuild_project" "api_deploy" {
       name  = "EMAIL_FROM"
       value = var.email_from
     }
+
+    environment_variable {
+      name  = "SES_CONFIGURATION_SET"
+      value = var.ses_mail_domain != null ? aws_sesv2_configuration_set.email[0].configuration_set_name : ""
+    }
   }
 
   source {

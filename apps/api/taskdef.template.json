@@ -27,7 +27,8 @@
         { "name": "BETTER_AUTH_URL", "value": "${BETTER_AUTH_URL}" },
         { "name": "GOOGLE_REDIRECT_URI", "value": "${GOOGLE_REDIRECT_URI}" },
         { "name": "EMAIL_PROVIDER", "value": "${EMAIL_PROVIDER}" },
-        { "name": "EMAIL_FROM", "value": "${EMAIL_FROM}" }
+        { "name": "EMAIL_FROM", "value": "${EMAIL_FROM}" },
+        { "name": "SES_CONFIGURATION_SET", "value": "${SES_CONFIGURATION_SET}" }
       ],
       "secrets": [
         { "name": "DATABASE_URL", "valueFrom": "${DATABASE_URL_ARN}" },
