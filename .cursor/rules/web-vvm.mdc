@@ -1,0 +1,91 @@
+---
+description: View / ViewModel / Model conventions for apps/web (Next.js + shadcn + TanStack Query)
+globs: apps/web/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# `apps/web` — View / ViewModel / Model
+
+The web client is structured MVVM-style. Keep these three layers separate.
+
+## Layers
+
+- **Models** (`src/lib/`, `src/models/`) — types, schemas, API clients,
+  pure helpers. No React imports, no JSX.
+- **ViewModels** (`src/hooks/`) — React hooks that own state, derived data,
+  and side effects (queries, mutations, subscriptions). Return a stable
+  shape (e.g. `{ state, actions }` or named fields). One hook per
+  screen/feature when state crosses multiple components.
+- **Views** (`src/components/`, `src/app/**/page.tsx`) — presentational
+  components. Receive data + callbacks via props. Render JSX. Local UI
+  state (focus, hover, controlled form inputs) is fine; cross-cutting state
+  is not.
+
+A page (`app/**/page.tsx`) is a thin wrapper: instantiate the ViewModel
+hook and pass its state + actions to a View.
+
+## Rules
+
+1. **No data fetching in views.** `fetch`, `useQuery`, `useMutation`,
+   `authClient.signIn.*`, EventSource, WebSocket — all live in hooks.
+   Views consume the result.
+2. **Prefer `useReducer` over `useState`** when state has more than
+   ~2 transitions, related fields that change together, or a finite state
+   machine shape (e.g. onboarding steps, multi-step forms, wizard flows).
+   Keep action types as a discriminated union.
+3. **Mutations and queries live in TanStack Query hooks** (`useMutation`,
+   `useQuery`). Wrap them in a domain-specific hook
+   (`useSignInVm`, `useOnboardingVm`, etc.) — components import the wrapper,
+   not the raw query.
+4. **Models never import from `@/components` or `@/hooks`.** Hooks may
+   import models. Views may import models for types only; runtime data
+   comes via props from the ViewModel.
+5. **Server Components stay thin.** If a page needs any of: state, effects,
+   mutations, `useSession`, browser APIs — it lives in a `'use client'`
+   ViewModel hook + View pair.
+
+## Example
+
+```tsx
+// Model: src/lib/auth-client.ts — Better Auth singleton + types
+export const authClient = createAuthClient({ baseURL: API_URL });
+
+// ViewModel: src/hooks/use-sign-in-vm.ts
+type State = { email: string; password: string; error: string | null };
+type Action =
+  | { type: "set-email"; value: string }
+  | { type: "set-password"; value: string }
+  | { type: "error"; message: string };
+
+function reducer(s: State, a: Action): State { /* ... */ }
+
+export function useSignInVm() {
+  const [state, dispatch] = React.useReducer(reducer, {
+    email: "", password: "", error: null,
+  });
+  const mutation = useMutation({
+    mutationFn: (v: { email: string; password: string }) =>
+      authClient.signIn.email(v),
+  });
+  return { state, dispatch, signIn: mutation.mutate, isPending: mutation.isPending };
+}
+
+// View: src/components/onboarding/sign-in.tsx
+export function SignIn({ state, dispatch, signIn, isPending }: SignInProps) {
+  return (/* JSX only, no fetch, no useQuery */);
+}
+
+// Page: src/app/login/page.tsx
+"use client";
+export default function LoginPage() {
+  const vm = useSignInVm();
+  return <SignIn {...vm} />;
+}
+```
+
+## Tells that you're violating this
+
+- A component file imports `@tanstack/react-query` directly → move to a hook.
+- A component file imports `authClient` → move to a hook.
+- A `useState` chain with 3+ pieces of related state → switch to `useReducer`.
+- A hook returns JSX → that's a view, not a viewmodel.

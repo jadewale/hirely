@@ -10,7 +10,13 @@ for "how do I work in this codebase".
 
 - `apps/api` — minimal NestJS service (Postgres via Drizzle, Inngest for
   async jobs). Exposes a public HTTP API documented via OpenAPI.
-- `apps/web` — Next.js client (placeholder; not the focus right now).
+- `apps/web` — Next.js 16 client (shadcn/ui base-nova + Tailwind v4 +
+  TanStack Query + Better Auth React client). Sign-in, sign-up,
+  onboarding orchestrator, and an authenticated dashboard stub all live
+  here. Structured MVVM-style — see `apps/web/README.md` and
+  `.cursor/rules/web-vvm.mdc`. **Hosted on Vercel** at
+  `app.mindoutreach.com` (the AWS Terraform stack only owns the CNAME at
+  `packages/terraform-aws/web_dns.tf`).
 - `packages/shared` — code shared between apps.
 - `packages/terraform-aws` — infrastructure as code for the AWS deploy.
 - `packages/eslint-config`, `packages/typescript-config` — shared tooling.
@@ -38,9 +44,17 @@ for "how do I work in this codebase".
 ```bash
 bun install                              # from repo root
 cp apps/api/.env.example apps/api/.env   # fill DATABASE_URL etc.
+cp apps/web/.env.example apps/web/.env.local   # NEXT_PUBLIC_API_URL
 docker compose -f apps/api/docker-compose.yml -p hirely up -d postgres
-cd apps/api && bun run dev               # starts on :4000
+bun --cwd apps/api run dev               # starts on :4000
+bun --cwd apps/web run dev               # starts on :3000 (in a 2nd terminal)
 ```
+
+Cross-origin auth: the web client makes `credentials: 'include'` calls to
+`/api/auth/*`, and CORS on the API is driven by `FRONTEND_URL` (see
+`apps/api/src/bootstrap.ts`). For local dev the defaults already line up
+(`http://localhost:3000` ↔ `http://localhost:4000`); for prod set
+`FRONTEND_URL` to a comma-separated origin list.
 
 Useful endpoints once running:
 
@@ -174,6 +188,14 @@ are in `apps/api/src/lib/auth.ts`; transactional templates are in
 - **`user/created` is NOT exposed via MCP**. Only Better Auth's
   `databaseHooks.user.create.after` may fire it. An agent firing it
   would trigger phantom welcome emails and start phantom nudge timers.
+- **Cross-origin from `apps/web`**. The web client uses Better Auth's
+  React client (`createAuthClient` with `baseURL = NEXT_PUBLIC_API_URL`),
+  which makes `credentials: 'include'` requests to `/api/auth/*`. The
+  API's CORS allowlist is driven by `FRONTEND_URL` in
+  `apps/api/src/bootstrap.ts` — comma-separated origins, exact match,
+  with `Access-Control-Allow-Credentials: true`. Adding a new web origin
+  means updating both `FRONTEND_URL` (CORS + trustedOrigins) and the
+  Google OAuth redirect URIs.
 
 ## Onboarding emails (Inngest)
 
@@ -355,6 +377,34 @@ apps/api/test/           # e2e tests (jest-e2e config) — auth.e2e-spec.ts need
 apps/api/Dockerfile      # multi-stage Bun build (copies drizzle/ into runner)
 apps/api/taskdef.template.json   # canonical ECS task definition (envsubst'd in CI)
 apps/api/docker-compose.yml      # local Postgres for `bun run dev`
+
+apps/web/src/
+  app/                   # Next.js App Router (each page = thin View over a VM hook)
+    layout.tsx           # wraps every route in <Providers>
+    providers.tsx        # ThemeProvider + QueryClientProvider + Toaster
+    page.tsx             # redirect → /onboarding
+    onboarding/page.tsx  # new-user orchestrator (sign-in → connect → scan → reveal)
+    login/page.tsx       # returning-user sign-in
+    sign-up/page.tsx     # account creation
+    dashboard/page.tsx   # authenticated landing (smoke test for the auth loop)
+  components/
+    ui/                  # shadcn primitives (button, card, alert, progress, …)
+    onboarding/          # SignIn / GmailConnect / Scanning / FirstReveal Views
+    dashboard/           # DashboardView
+  hooks/                 # ViewModels — own state + side effects (queries, mutations)
+    use-auth-mutations.ts    # shared Better Auth mutations (model-layer)
+    use-onboarding-vm.ts     # useReducer step machine for /onboarding
+    use-login-vm.ts          # /login VM
+    use-sign-up-vm.ts        # /sign-up VM
+    use-dashboard-vm.ts      # /dashboard VM (session + signOut)
+  lib/                   # Models — pure, no React
+    env.ts               # NEXT_PUBLIC_API_URL
+    auth-client.ts       # Better Auth React client singleton
+    query-client.ts      # TanStack QueryClient factory (server/client split)
+    utils.ts             # cn()
+    onboarding-data.ts   # mock data for the canvas
+
+.cursor/rules/web-vvm.mdc   # View / ViewModel / Model conventions for apps/web
 
 buildspec.yml            # CodeBuild "Build": builds + pushes Docker image (SHA tag)
 deployspec.yml           # CodeBuild "Deploy": renders taskdef, register, update service
