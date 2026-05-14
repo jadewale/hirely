@@ -1,9 +1,26 @@
 {
-  "moduleFileExtensions": ["js", "json", "ts"],
+  "moduleFileExtensions": ["js", "json", "ts", "mjs", "cjs"],
   "rootDir": ".",
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
+  "setupFiles": ["<rootDir>/jest.setup.ts"],
   "transform": {
-    "^.+\\.(t|j)s$": "ts-jest"
-  }
+    "^.+\\.(t|j|mj|cj)s$": [
+      "@swc/jest",
+      {
+        "jsc": {
+          "parser": { "syntax": "typescript", "decorators": true },
+          "transform": {
+            "legacyDecorator": true,
+            "decoratorMetadata": true
+          },
+          "target": "es2022"
+        },
+        "module": { "type": "commonjs" }
+      }
+    ]
+  },
+  "transformIgnorePatterns": [
+    "/node_modules/(?!.*(?:better-auth|@better-auth|@thallesp|better-call|rou3|nanoid|uncrypto|@noble|jose|defu|destr|ufo|hookable|consola|scule|pathe|c12|magic-regexp))"
+  ]
 }

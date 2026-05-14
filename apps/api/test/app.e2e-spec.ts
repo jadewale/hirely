@@ -1,9 +1,3 @@
-// Set placeholder env vars before AppModule is imported. DbModule
-// instantiates the postgres client at module-load time (lazy connection),
-// and Inngest needs INNGEST_DEV=1 to skip signing-key checks in tests.
-process.env.DATABASE_URL ??= 'postgres://test:test@localhost:5432/test';
-process.env.INNGEST_DEV ??= '1';
-
 import { INestApplication } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -23,7 +17,12 @@ describe('App (e2e)', () => {
       .useValue({ execute: () => Promise.resolve([{ '?column?': 1 }]) })
       .compile();
 
-    app = moduleFixture.createNestApplication<NestExpressApplication>();
+    // bodyParser:false mirrors prod (main.ts) — AuthModule re-installs JSON
+    // and urlencoded parsers for non-auth routes, so request bodies on
+    // /api/inngest, /api/mcp, etc. still parse correctly.
+    app = moduleFixture.createNestApplication<NestExpressApplication>({
+      bodyParser: false,
+    });
     configureApp(app as NestExpressApplication);
     await app.init();
   });

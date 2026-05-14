@@ -1,8 +1,10 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import { HealthResponseDto } from './dto/health-response.dto';
 import { HealthService } from './health.service';
 
+@AllowAnonymous()
 @ApiTags('health')
 @Controller('health')
 export class HealthController {

@@ -1,6 +1,7 @@
 import { Controller, Delete, Get, Post, Req, Res } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import type { Request, Response } from 'express';
 import { McpService } from './mcp.service';
 
@@ -15,6 +16,7 @@ import { McpService } from './mcp.service';
  * Excluded from OpenAPI because the route speaks JSON-RPC, not REST — its
  * contract is the MCP spec plus the tools registered in `McpService`.
  */
+@AllowAnonymous()
 @ApiExcludeController()
 @Controller('mcp')
 export class McpController {

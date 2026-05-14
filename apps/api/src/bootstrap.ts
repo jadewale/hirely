@@ -14,9 +14,10 @@ import { functions as inngestFunctions } from './inngest/functions';
 export function configureApp(app: NestExpressApplication): void {
   app.setGlobalPrefix('api');
 
-  // Inngest's serve() expects a parsed JSON body. Register the parser
-  // explicitly BEFORE app.use() so it sits in front of the Inngest handler.
-  app.useBodyParser('json', { limit: '10mb' });
+  // Body parsing is handled by @thallesp/nestjs-better-auth's AuthModule:
+  // JSON and urlencoded parsers are installed for every non-auth route, and
+  // the raw body is preserved for /api/auth/* so Better Auth can read it.
+  // Do not call `app.useBodyParser('json')` here — it would shadow that wiring.
 
   // OpenAPI / Swagger. Mounted at /api/docs (UI) and /api/docs-json
   // (raw spec for clients, MCP generators, and agent tooling).

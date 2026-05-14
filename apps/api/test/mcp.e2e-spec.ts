@@ -1,7 +1,3 @@
-// Set placeholder env vars before AppModule is imported.
-process.env.DATABASE_URL ??= 'postgres://test:test@localhost:5432/test';
-process.env.INNGEST_DEV ??= '1';
-
 import { INestApplication } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -24,7 +20,9 @@ describe('MCP (e2e)', () => {
       .useValue({ execute: () => Promise.resolve([{ '?column?': 1 }]) })
       .compile();
 
-    app = moduleFixture.createNestApplication<NestExpressApplication>();
+    app = moduleFixture.createNestApplication<NestExpressApplication>({
+      bodyParser: false,
+    });
     configureApp(app as NestExpressApplication);
     await app.listen(0);
     const server = app.getHttpServer() as Server;

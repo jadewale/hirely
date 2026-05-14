@@ -43,6 +43,7 @@ COPY --from=builder --chown=appuser:appgroup /app/node_modules ./node_modules
 COPY --from=builder --chown=appuser:appgroup /app/apps/api/package.json ./apps/api/package.json
 COPY --from=builder --chown=appuser:appgroup /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=builder --chown=appuser:appgroup /app/apps/api/dist ./apps/api/dist
+COPY --from=builder --chown=appuser:appgroup /app/apps/api/drizzle ./apps/api/drizzle
 
 WORKDIR /app/apps/api
 
