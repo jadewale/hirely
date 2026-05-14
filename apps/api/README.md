@@ -47,10 +47,14 @@ src/
     clients/             # fetch | axios
   inngest/
     client.ts            # singleton Inngest client
+    events.ts            # typed event catalog (eventType + staticSchema)
     functions/           # one file per function, aggregated by index.ts
+                         #   onboarding-welcome / -inbox-nudge / -resume-nudge
   lib/
     auth.ts              # Better Auth instance — source of truth for /api/auth/*
-    auth-emails.ts       # HTML+text templates for verify / reset / welcome
+    auth-emails.ts       # templates for verify + reset
+    onboarding-emails.ts # templates for welcome + nudges
+    email-render.ts      # shared chrome (wrap/button/BRAND)
   mcp/
     mcp.module.ts
     mcp.service.ts       # builds an McpServer with all registered tools
@@ -186,9 +190,19 @@ Migrations apply automatically at container start via `runMigrations()` in
 ## Auth
 
 Better Auth (`@thallesp/nestjs-better-auth`) is mounted at `/api/auth/*`.
-Sign-up sends a verification email; password reset and a welcome email are
-also wired through `EmailProvider`. Configuration lives in `src/lib/auth.ts`;
-email templates live in `src/lib/auth-emails.ts`.
+Sign-up sends a verification email; password reset is handled by Better
+Auth's `sendResetPassword` callback. Both go through `EmailProvider`.
+
+Welcome + onboarding nudges (inbox connection, resume upload) do NOT run
+inside Better Auth — they're Inngest functions triggered by a single
+`user/created` event fired from `databaseHooks.user.create.after`. The
+nudges use Inngest's `cancelOn` to suppress themselves when the matching
+completion event fires (`integrations/inbox.connected`, `resumes/uploaded`).
+See `src/inngest/events.ts` and `src/inngest/functions/onboarding-*.ts`.
+
+Configuration lives in `src/lib/auth.ts`; templates split between
+`src/lib/auth-emails.ts` (verify + reset) and `src/lib/onboarding-emails.ts`
+(welcome + nudges).
 
 A global guard requires a session on every route. Endpoints that must stay
 public carry `@AllowAnonymous()` from `@thallesp/nestjs-better-auth` —

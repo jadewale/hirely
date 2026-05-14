@@ -10,13 +10,10 @@ import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import { Logger } from '@nestjs/common';
 import { db } from '../db';
-import { createEmailProvider } from '../email/email.factory';
-import { createHttpClient } from '../http/http.factory';
-import {
-  resetPasswordEmail,
-  verificationEmail,
-  welcomeEmail,
-} from './auth-emails';
+import { getEmailProvider } from '../email/email.factory';
+import { inngest } from '../inngest/client';
+import { userCreated } from '../inngest/events';
+import { resetPasswordEmail, verificationEmail } from './auth-emails';
 
 const requireEnv = (name: string): string => {
   const value = process.env[name];
@@ -35,11 +32,11 @@ const optionalEnv = (name: string): string | undefined => {
 };
 
 // Singletons built outside the Nest DI container — Better Auth's instance is
-// constructed at module-load time, before DI exists. Using the same factory
-// functions that EmailModule / HttpModule rely on keeps the two surfaces in
-// sync; flip EMAIL_PROVIDER / HTTP_CLIENT and both pick up the change.
-const emailLogger = new Logger('AuthEmail');
-const emailProvider = createEmailProvider(createHttpClient());
+// constructed at module-load time, before DI exists. Using the shared
+// `getEmailProvider()` keeps this surface in sync with `EmailModule` and the
+// Inngest functions: flip EMAIL_PROVIDER and all three pick up the change.
+const onboardingLogger = new Logger('AuthOnboarding');
+const emailProvider = getEmailProvider();
 const emailFrom =
   process.env.EMAIL_FROM ?? 'Hirely <onboarding@mindoutreach.com>';
 
@@ -85,21 +82,35 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
-        // One-shot welcome email. Errors here are logged but swallowed —
-        // a transient Resend hiccup must NOT block a sign-up from finishing.
+        // Kick off the onboarding sequence. We deliberately do NOT send the
+        // welcome email inline here — it lives in an Inngest function so
+        // (a) we can retry it on transient SES failures without retrying
+        // sign-up and (b) it lives next to the inbox/resume nudges that
+        // depend on the same `user/created` event for `cancelOn` matching.
+        //
+        // The event-id is set to `user-created-${userId}` so a duplicate
+        // hook invocation (e.g. if Better Auth retries) becomes a no-op at
+        // Inngest's dedupe layer instead of triggering two welcome runs.
+        //
+        // Errors are logged but swallowed: a flaky Inngest event-API
+        // response must never block sign-up. Worst case the user is
+        // created but never sees the welcome email — much better than the
+        // alternative of failing the sign-up.
         after: async (user) => {
           try {
-            const tpl = welcomeEmail(user.name);
-            await emailProvider.sendEmail({
-              from: emailFrom,
-              to: user.email,
-              subject: tpl.subject,
-              html: tpl.html,
-              text: tpl.text,
-            });
+            await inngest.send(
+              userCreated.create(
+                {
+                  userId: user.id,
+                  email: user.email,
+                  name: user.name,
+                },
+                { id: `user-created-${user.id}` },
+              ),
+            );
           } catch (err) {
-            emailLogger.error(
-              `welcome email failed for ${user.email}: ${
+            onboardingLogger.error(
+              `inngest.send('user/created') failed for ${user.email}: ${
                 err instanceof Error ? err.message : String(err)
               }`,
             );

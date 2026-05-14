@@ -41,11 +41,13 @@ alwaysApply: false
   with a global guard. Anonymous endpoints (`/api/health`, `/api/mcp`,
   Inngest's webhook) MUST be decorated with `@AllowAnonymous()` from
   `@thallesp/nestjs-better-auth`. Authentication options live in
-  `src/lib/auth.ts`; transactional email templates live in
-  `src/lib/auth-emails.ts`. Better Auth's instance is built outside the
-  Nest DI container, so it uses the plain factories in
-  `src/email/email.factory.ts` and `src/http/http.factory.ts` — keep those
-  factories in sync with the Nest providers in `*.module.ts`.
+  `src/lib/auth.ts`. Verify + reset templates live in
+  `src/lib/auth-emails.ts`; welcome + onboarding nudges live in
+  `src/lib/onboarding-emails.ts` and run as Inngest functions, NOT inline
+  in the auth hook. Better Auth's instance is built outside the Nest DI
+  container, so it uses the memoized singleton `getEmailProvider()` from
+  `src/email/email.factory.ts` — the Inngest functions use the same
+  singleton, ensuring one provider serves every email path.
 - Auth flows (sign-up, sign-in, password reset, OAuth callback) are NOT
   exposed as MCP tools. They are user-initiated and depend on session
   cookies, which MCP's stateless Streamable HTTP transport cannot carry.

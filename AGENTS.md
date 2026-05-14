@@ -125,10 +125,11 @@ flipping back is a one-line change.
   "Request production access" in the SES console — this step is **not**
   Terraformable.
 
-Better Auth's verify / reset / welcome callbacks also use `EmailProvider`,
-but they go through the plain factory in `src/email/email.factory.ts`
-instead of Nest DI (Better Auth's instance is constructed at module-load
-time, before DI exists). Keep the factory and the Nest provider in sync.
+Better Auth's verify / reset callbacks call `getEmailProvider()` (a
+memoized singleton from `src/email/email.factory.ts`) so they reuse the
+same provider as the rest of the app. Inngest functions use the same
+helper. The welcome / nudge emails are NOT sent from Better Auth — see
+[Onboarding emails](#onboarding-emails-inngest) below.
 
 ## Auth
 
@@ -162,6 +163,54 @@ are in `apps/api/src/lib/auth.ts`; transactional templates are in
   MCP's stateless Streamable HTTP transport cannot carry. The "one
   service, two surfaces" rule still applies to your own domain features,
   just not to Better Auth's surface.
+
+## Onboarding emails (Inngest)
+
+Welcome + nudge emails go through Inngest, not Better Auth. The auth
+hook's only job is to fire one `user/created` event; everything else —
+welcome, "connect your inbox" nudge, "upload your resume" nudge — runs
+as a separate Inngest function. This keeps sign-up fast, retries
+transparent, and the nudge cancellation logic declarative.
+
+### Event catalog (`apps/api/src/inngest/events.ts`)
+
+The Inngest client uses typed event schemas so `inngest.send(...)` and
+`cancelOn` predicates are checked at compile time. Current events:
+
+| Event                            | Producer                                          | Consumers                                                      |
+| -------------------------------- | ------------------------------------------------- | -------------------------------------------------------------- |
+| `user/created`                   | `lib/auth.ts` — `databaseHooks.user.create.after` | `onboarding-welcome`, `onboarding-inbox-nudge`, `onboarding-resume-nudge` |
+| `integrations/inbox.connected`   | Integrations feature (TBD)                        | Cancels `onboarding-inbox-nudge`                               |
+| `resumes/uploaded`               | Resumes feature (TBD)                             | Cancels `onboarding-resume-nudge`                              |
+
+### The `cancelOn` pattern
+
+The two nudge functions each `step.sleep('5d')` and then send their
+email. They DON'T query the DB to check "did the user do X?" — instead
+they declare `cancelOn` and let Inngest cancel the run when the matching
+event arrives. The expression `async.data.userId == event.data.userId`
+scopes cancellation to the right user.
+
+This means: **every action that should suppress a nudge MUST emit an
+event matching the cancel predicate.** When the integrations feature
+ships, the inbox-connect handler MUST `await inngest.send({ name:
+'integrations/inbox.connected', data: { userId, provider } })`. Same
+for resume upload. If the event isn't emitted, the nudge will fire even
+though the user already completed the action.
+
+### Adding a new nudge
+
+1. Add the cancel-event to `apps/api/src/inngest/events.ts` (include
+   `data.userId` so `cancelOn` can match).
+2. Create `apps/api/src/inngest/functions/onboarding-<name>.ts`
+   following the inbox/resume pattern (`step.sleep` → `step.run`).
+3. Wire it into `apps/api/src/inngest/functions/index.ts`.
+4. Add an email template to `apps/api/src/lib/onboarding-emails.ts`.
+5. Update the feature code that completes the action to emit the
+   cancel-event.
+
+Tune the delay locally with `ONBOARDING_NUDGE_DELAY=30s` to exercise
+the path without waiting 5 days.
 
 ## Database (Drizzle)
 
@@ -262,11 +311,17 @@ apps/api/src/
     http.factory.ts      # plain factory used by both HttpModule AND lib/auth.ts
     clients/             # fetch | axios implementations
   inngest/
-    client.ts            # singleton Inngest client
+    client.ts            # singleton Inngest client (typed via events.ts)
+    events.ts            # typed event catalog — every send + cancelOn references it
     functions/           # one file per function, aggregated by index.ts
+      onboarding-welcome.ts        # sends welcome email on user/created
+      onboarding-inbox-nudge.ts    # 5d nudge, cancelOn integrations/inbox.connected
+      onboarding-resume-nudge.ts   # 5d nudge, cancelOn resumes/uploaded
   lib/
     auth.ts              # Better Auth instance — source of truth for /api/auth/*
-    auth-emails.ts       # HTML+text templates for verify / reset / welcome
+    auth-emails.ts       # templates for verify + reset (Better Auth's direct callbacks)
+    onboarding-emails.ts # templates for welcome + nudges (rendered by Inngest functions)
+    email-render.ts      # shared wrap()/button() chrome for every template
   mcp/                   # /api/mcp: controller + service registering MCP tools
 apps/api/drizzle/        # generated SQL migrations + drizzle-kit meta
 apps/api/test/           # e2e tests (jest-e2e config) — auth.e2e-spec.ts needs TEST_DATABASE_URL
