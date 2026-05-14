@@ -49,8 +49,9 @@ describe('MCP (e2e)', () => {
       expect(names).toEqual([
         'getHealth',
         'listInngestFunctions',
-        'markInboxConnected',
-        'markResumeUploaded',
+        'markMyInboxConnected',
+        'markMyResumeUploaded',
+        'whoami',
       ]);
     } finally {
       await client.close();
@@ -65,6 +66,20 @@ describe('MCP (e2e)', () => {
         status: 'ok',
         db: 'up',
       });
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('callTool whoami returns an auth-required error without a bearer token', async () => {
+    const client = await connect();
+    try {
+      const result = (await client.callTool({ name: 'whoami' })) as {
+        isError?: boolean;
+        content: Array<{ type: string; text: string }>;
+      };
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text ?? '').toMatch(/requires authentication/i);
     } finally {
       await client.close();
     }

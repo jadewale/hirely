@@ -7,6 +7,7 @@
  * a database connection (no top-level queries).
  */
 import { betterAuth } from 'better-auth';
+import { bearer } from 'better-auth/plugins';
 import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import { Logger } from '@nestjs/common';
 import { db } from '../db';
@@ -133,6 +134,13 @@ export const auth = betterAuth({
     process.env.FRONTEND_URL ?? 'http://localhost:3000',
     process.env.BETTER_AUTH_URL ?? 'http://localhost:4000',
   ],
+  // The bearer plugin turns `Authorization: Bearer <session-token>` headers
+  // into validated sessions, which is the auth path used by non-browser
+  // clients (MCP tools, mobile apps, server-side automation). The token
+  // itself is the same value Better Auth already returns in cookie form
+  // from sign-up / sign-in; the plugin just teaches the auth pipeline to
+  // accept it from a header too.
+  plugins: [bearer()],
 });
 
 export type Auth = typeof auth;

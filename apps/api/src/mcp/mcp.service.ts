@@ -12,14 +12,33 @@ import { functions } from '../inngest/functions';
  * server across requests — but tool handlers close over NestJS-injected
  * services, so they share the same DB pool, Inngest client, etc.
  *
- * Tools registered here are the agent-facing surface area. Rules:
- *   - Pure-read tools (e.g. `getHealth`, `listInngestFunctions`) should
- *     mirror HTTP endpoints where one exists, and have no side effects.
- *   - Write tools (e.g. `markInboxConnected`) should map 1:1 to a single
- *     domain event in `inngest/events.ts`. NEVER expose `user/created` —
- *     only Better Auth's sign-up hook is allowed to fire it, otherwise an
- *     agent could trigger phantom welcome emails for existing users.
+ * Auth model: the controller hands every `createServer()` call an
+ * `McpAuthContext`. Tools choose their own posture:
+ *
+ *   - **Public**: read-only system info (`getHealth`, `listInngestFunctions`).
+ *     Don't touch `auth.user`, work for anonymous and authenticated callers.
+ *   - **User-scoped**: act on behalf of the caller. Wrap the handler in
+ *     `requireUser(auth)` so anonymous callers get a clear "sign in" error
+ *     instead of a 500 / silent no-op. NEVER take a `userId` parameter —
+ *     pull it from the session.
+ *   - (Future) **Admin-scoped**: same as user-scoped but checks an admin
+ *     role; lets support engineers act on another user's behalf. Not in
+ *     this slice — add an `admin` plugin to Better Auth when needed.
+ *
+ * `user/created` is still NOT exposed as a tool. Only Better Auth's
+ * sign-up hook may fire it; an agent doing so would spawn phantom welcome
+ * emails and start phantom nudge timers.
  */
+
+export interface McpAuthUser {
+  id: string;
+  email: string;
+  name: string;
+}
+
+export interface McpAuthContext {
+  user: McpAuthUser | null;
+}
 
 interface InngestEventRef {
   name?: string;
@@ -35,22 +54,36 @@ interface InngestFunctionOpts {
 const eventName = (ev: InngestEventRef | string | undefined): string =>
   typeof ev === 'string' ? ev : (ev?.name ?? ev?.event ?? '<unknown>');
 
+// Throws a friendly MCP-level error when a user-scoped tool is called
+// anonymously. The thrown message bubbles up to the MCP client as the
+// tool result's error content — significantly more useful than a 500.
+const requireUser = (auth: McpAuthContext): McpAuthUser => {
+  if (!auth.user) {
+    throw new Error(
+      'This tool requires authentication. Send an Authorization: Bearer <session-token> header.',
+    );
+  }
+  return auth.user;
+};
+
 @Injectable()
 export class McpService {
   constructor(private readonly health: HealthService) {}
 
-  createServer(): McpServer {
+  createServer(auth: McpAuthContext): McpServer {
     const server = new McpServer({
       name: 'hirely-api',
       version: process.env.npm_package_version ?? '0.0.1',
     });
+
+    // ── Public tools ────────────────────────────────────────────────────
 
     server.registerTool(
       'getHealth',
       {
         title: 'Get API health',
         description:
-          'Returns the liveness + database probe payload that powers GET /api/health.',
+          'Returns the liveness + database probe payload that powers GET /api/health. Public — no auth required.',
       },
       async () => {
         const result = await this.health.check();
@@ -68,8 +101,7 @@ export class McpService {
         description:
           'Returns every Inngest function the API has registered with the ' +
           'serve() handler — id, name, trigger event, and any cancelOn ' +
-          'predicates. Useful for an agent to confirm a function exists, ' +
-          'check what cancels it, or report on the onboarding sequence.',
+          'predicates. Public read-only introspection.',
       },
       () => {
         const items = functions.map((fn) => {
@@ -91,73 +123,94 @@ export class McpService {
       },
     );
 
+    // ── User-scoped tools ───────────────────────────────────────────────
+
     server.registerTool(
-      'markInboxConnected',
+      'whoami',
       {
-        title: 'Mark a user as having connected their inbox',
+        title: 'Identify the authenticated user',
         description:
-          'Fires the `integrations/inbox.connected` event for a user. This ' +
-          'cancels any pending `onboarding-inbox-nudge` Inngest run for that ' +
-          "user. Use when a user's inbox has been connected outside the " +
-          'normal OAuth flow (manual support fix, migration, dev/test).',
-        inputSchema: {
-          userId: z
-            .string()
-            .min(1)
-            .describe('The user.id (text) whose inbox was connected.'),
-          provider: z
-            .enum(['google', 'microsoft', 'imap'])
-            .describe('Which provider the inbox was connected through.'),
-        },
+          'Returns id / email / name for the user resolved from the request. ' +
+          'Use this to verify the bearer token pipeline is wired correctly. ' +
+          'Requires an authenticated session.',
       },
-      async ({ userId, provider }) => {
-        const result = await inngest.send(
-          integrationsInboxConnected.create({ userId, provider }),
-        );
+      () => {
+        const user = requireUser(auth);
         return {
-          content: [
-            {
-              type: 'text',
-              text: `Fired integrations/inbox.connected for user ${userId} (provider=${provider}). Inngest ids: ${JSON.stringify(result.ids)}`,
-            },
-          ],
-          structuredContent: { ids: result.ids, userId, provider },
+          content: [{ type: 'text', text: JSON.stringify(user, null, 2) }],
+          structuredContent: { ...user },
         };
       },
     );
 
     server.registerTool(
-      'markResumeUploaded',
+      'markMyInboxConnected',
       {
-        title: 'Mark a user as having uploaded a resume',
+        title: 'Record that I connected my inbox',
         description:
-          'Fires the `resumes/uploaded` event for a user. This cancels any ' +
-          'pending `onboarding-resume-nudge` Inngest run for that user. Use ' +
-          'when a resume is added outside the upload UI (manual support fix, ' +
-          'migration, dev/test).',
+          'Fires the `integrations/inbox.connected` event for the authenticated ' +
+          'user. This cancels any pending `onboarding-inbox-nudge` Inngest run ' +
+          'and unblocks any feature that waits for this signal. The user id is ' +
+          'taken from the session — do NOT pass it explicitly.',
         inputSchema: {
-          userId: z
-            .string()
-            .min(1)
-            .describe('The user.id (text) whose resume was uploaded.'),
+          provider: z
+            .enum(['google', 'microsoft', 'imap'])
+            .describe('Which provider the inbox was connected through.'),
+        },
+      },
+      async ({ provider }) => {
+        const user = requireUser(auth);
+        const result = await inngest.send(
+          integrationsInboxConnected.create({ userId: user.id, provider }),
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Fired integrations/inbox.connected for ${user.email} (provider=${provider}). Inngest ids: ${JSON.stringify(result.ids)}`,
+            },
+          ],
+          structuredContent: {
+            ids: result.ids,
+            userId: user.id,
+            provider,
+          },
+        };
+      },
+    );
+
+    server.registerTool(
+      'markMyResumeUploaded',
+      {
+        title: 'Record that I uploaded a resume',
+        description:
+          'Fires the `resumes/uploaded` event for the authenticated user. ' +
+          'This cancels any pending `onboarding-resume-nudge` Inngest run. ' +
+          'The user id is taken from the session — do NOT pass it explicitly.',
+        inputSchema: {
           resumeId: z
             .string()
             .min(1)
             .describe('Identifier for the uploaded resume row.'),
         },
       },
-      async ({ userId, resumeId }) => {
+      async ({ resumeId }) => {
+        const user = requireUser(auth);
         const result = await inngest.send(
-          resumesUploaded.create({ userId, resumeId }),
+          resumesUploaded.create({ userId: user.id, resumeId }),
         );
         return {
           content: [
             {
               type: 'text',
-              text: `Fired resumes/uploaded for user ${userId} (resumeId=${resumeId}). Inngest ids: ${JSON.stringify(result.ids)}`,
+              text: `Fired resumes/uploaded for ${user.email} (resumeId=${resumeId}). Inngest ids: ${JSON.stringify(result.ids)}`,
             },
           ],
-          structuredContent: { ids: result.ids, userId, resumeId },
+          structuredContent: {
+            ids: result.ids,
+            userId: user.id,
+            resumeId,
+          },
         };
       },
     );

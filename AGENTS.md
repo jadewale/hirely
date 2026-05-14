@@ -158,16 +158,22 @@ are in `apps/api/src/lib/auth.ts`; transactional templates are in
   in Google OAuth). `GOOGLE_CLIENT_ID`/`SECRET` are optional — when unset
   Better Auth silently drops the Google provider so local dev boots
   cleanly.
-- **No MCP parity for auth**: sign-up, sign-in, password reset, and the
-  OAuth callback are user-initiated and depend on session cookies that
-  MCP's stateless Streamable HTTP transport cannot carry. The "one
-  service, two surfaces" rule still applies to your own domain features,
-  just not to Better Auth's surface.
-- **MCP parity for onboarding events**: the events that cancel onboarding
-  nudges (`integrations/inbox.connected`, `resumes/uploaded`) are
-  exposed as `markInboxConnected` / `markResumeUploaded` tools in
-  `src/mcp/mcp.service.ts`. `user/created` is intentionally NOT exposed
-  — only Better Auth's `databaseHooks.user.create.after` may fire it.
+- **MCP authenticates via bearer token, not cookies**. The Better Auth
+  `bearer()` plugin (enabled in `lib/auth.ts`) reads
+  `Authorization: Bearer <session-token>` and validates against the same
+  `session` table the cookie path uses. The token returned by sign-up /
+  sign-in is the value to send. `McpController` extracts the user via
+  `auth.api.getSession({ headers })` and hands an `McpAuthContext` to
+  every tool handler; tools call `requireUser(auth)` when they need a
+  caller.
+- **Sign-up itself stays human-only**. An agent can't prove control of a
+  human's email, so `/api/auth/sign-up/email`, `sign-in/*`, password
+  reset, and the OAuth callback are NOT exposed as MCP tools. Humans
+  sign up in the browser, then hand the resulting token to their MCP
+  client to act as themselves.
+- **`user/created` is NOT exposed via MCP**. Only Better Auth's
+  `databaseHooks.user.create.after` may fire it. An agent firing it
+  would trigger phantom welcome emails and start phantom nudge timers.
 
 ## Onboarding emails (Inngest)
 
@@ -341,8 +347,9 @@ apps/api/src/
     onboarding-emails.ts # templates for welcome + nudges (rendered by Inngest functions)
     email-render.ts      # shared wrap()/button() chrome for every template
   mcp/                   # /api/mcp: controller + service registering MCP tools
-                         #   getHealth, listInngestFunctions,
-                         #   markInboxConnected, markResumeUploaded
+                         #   public:        getHealth, listInngestFunctions
+                         #   user-scoped:   whoami, markMyInboxConnected,
+                         #                  markMyResumeUploaded
 apps/api/drizzle/        # generated SQL migrations + drizzle-kit meta
 apps/api/test/           # e2e tests (jest-e2e config) — auth.e2e-spec.ts needs TEST_DATABASE_URL
 apps/api/Dockerfile      # multi-stage Bun build (copies drizzle/ into runner)
@@ -393,14 +400,30 @@ Therefore:
 
 ## Documentation for downstream agents
 
+### Three auth patterns
+
+| Pattern                             | Token                                                                | When to use                                                              |
+| ----------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **Anonymous**                       | none                                                                 | System-status MCP tools (`getHealth`, `listInngestFunctions`). No writes |
+| **User-as-themselves**              | `Authorization: Bearer <session-token>` (from sign-up/sign-in)       | An agent (Cursor, Claude Desktop, etc.) acting on behalf of a specific human user. Most product tools live here |
+| **Service account / admin** (TODO) | API key plugin OR admin role on session                              | Backend automation; support engineers acting on another user's behalf. Not wired yet — add Better Auth's `apiKey` / `admin` plugin when needed |
+
+### Building an agent-callable feature
+
 Anything you build that should be callable by an external agent must:
 
 1. Be reachable via the HTTP API and show up in `/api/docs-json`.
 2. Have a typed DTO for both input and response.
 3. Have a corresponding MCP tool registered in `apps/api/src/mcp/mcp.service.ts`
    so the agent surface stays in sync with the HTTP surface.
-4. Have at least one unit test on the service, and (if it touches the request
-   lifecycle) one e2e test on the controller AND one on the MCP tool.
+4. Decide its auth posture explicitly:
+   - public read-only → no `requireUser`; works for anonymous callers
+   - user-scoped writes → call `requireUser(auth)` and pull the userId
+     from the session. **Do NOT take a `userId` parameter** — the
+     session is the source of truth.
+5. Have at least one unit test on the service, and (if it touches the request
+   lifecycle) one e2e test on the controller AND one on the MCP tool
+   (including an anonymous-rejection case for user-scoped tools).
 
 When in doubt, copy the pattern in `apps/api/src/health/`:
 
