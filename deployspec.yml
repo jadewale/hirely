@@ -40,3 +40,11 @@ phases:
       - echo "Waiting for service to stabilize..."
       - aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
       - echo "Deploy complete. Running revision $TASK_DEF_ARN"
+      # Trigger an Inngest re-sync so the dashboard picks up any added /
+      # removed functions in this revision. PUT /api/inngest is the
+      # serve-handler's self-registration endpoint -- it pulls the in-memory
+      # function manifest and POSTs it to Inngest Cloud signed with
+      # INNGEST_SIGNING_KEY. Made non-fatal: a flaky Inngest control plane
+      # must not roll back an otherwise healthy ECS deploy.
+      - echo "Syncing Inngest functions..."
+      - curl -fsS -X PUT "$BETTER_AUTH_URL/api/inngest" || echo "WARN Inngest sync failed (non-fatal)"
