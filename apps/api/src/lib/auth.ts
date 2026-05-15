@@ -42,6 +42,17 @@ const emailProvider = getEmailProvider();
 const emailFrom =
   process.env.EMAIL_FROM ?? 'Hirely <onboarding@mindoutreach.com>';
 
+// The first parsed FRONTEND_URL entry is the canonical web origin (prod
+// list is "<prod>,<localhost-fallback>"). We use it to build absolute
+// post-auth redirect URLs that work in emails -- where relative paths
+// would resolve against the API host (api.mindoutreach.com) and 404.
+const webOrigins = parseOrigins(
+  process.env.FRONTEND_URL,
+  'http://localhost:3000',
+);
+const webOrigin = webOrigins[0] ?? 'http://localhost:3000';
+const emailVerificationCallbackURL = `${webOrigin}/onboarding`;
+
 export const auth = betterAuth({
   appName: 'Hirely',
   baseURL: process.env.BETTER_AUTH_URL ?? 'http://localhost:4000',
@@ -70,6 +81,12 @@ export const auth = betterAuth({
     // until they click the link.
     sendOnSignUp: true,
     autoSignInAfterVerification: true,
+    // Where the user lands after Better Auth verifies the token. Without
+    // this, Better Auth falls back to `${baseURL}/` (the API origin),
+    // which 404s because Nest only registers `/api/*` routes. Point it
+    // at the web origin so verified users land inside the onboarding
+    // flow instead.
+    callbackURL: emailVerificationCallbackURL,
     sendVerificationEmail: async ({ user, url }) => {
       const tpl = verificationEmail(user.name, url);
       await emailProvider.sendEmail({
