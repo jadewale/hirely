@@ -15,6 +15,7 @@ import { getEmailProvider } from '../email/email.factory';
 import { inngest } from '../inngest/client';
 import { userCreated } from '../inngest/events';
 import { resetPasswordEmail, verificationEmail } from './auth-emails';
+import { parseOrigins } from './origins';
 
 const requireEnv = (name: string): string => {
   const value = process.env[name];
@@ -130,8 +131,18 @@ export const auth = betterAuth({
         }
       : {}),
   },
+  // Better Auth uses this for two things:
+  //   1. CSRF protection: rejects POST /api/auth/* requests whose Origin
+  //      header isn't in this list.
+  //   2. Redirect validation: rejects social-sign-in requests whose
+  //      callbackURL doesn't resolve to one of these origins with
+  //      "Invalid callbackURL".
+  //
+  // FRONTEND_URL is a comma-separated list in prod, single value in dev,
+  // and must match the CORS allowlist in bootstrap.ts -- otherwise the
+  // browser passes CORS but Better Auth still 400s the request.
   trustedOrigins: [
-    process.env.FRONTEND_URL ?? 'http://localhost:3000',
+    ...parseOrigins(process.env.FRONTEND_URL, 'http://localhost:3000'),
     process.env.BETTER_AUTH_URL ?? 'http://localhost:4000',
   ],
   // The bearer plugin turns `Authorization: Bearer <session-token>` headers

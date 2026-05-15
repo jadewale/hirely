@@ -3,21 +3,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { serve } from 'inngest/express';
 import { inngest } from './inngest/client';
 import { functions as inngestFunctions } from './inngest/functions';
-
-/**
- * Parse a comma-separated origin list into a deduplicated array.
- *
- * Empty entries and trailing slashes are stripped so `FRONTEND_URL` can be
- * set to a single value in dev and to a list in prod without further fuss.
- */
-function parseOrigins(raw: string | undefined, fallback: string): string[] {
-  const source = raw && raw !== 'unset' ? raw : fallback;
-  const list = source
-    .split(',')
-    .map((o) => o.trim().replace(/\/+$/, ''))
-    .filter((o) => o.length > 0);
-  return Array.from(new Set(list));
-}
+import { parseOrigins } from './lib/origins';
 
 /**
  * Apply runtime wiring shared by `main.ts` and end-to-end tests.
