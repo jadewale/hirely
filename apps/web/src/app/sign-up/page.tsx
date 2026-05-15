@@ -1,6 +1,6 @@
 "use client";
 
-import { SignIn } from "@/components/onboarding/sign-in";
+import { SignUp } from "@/components/onboarding/sign-up";
 import { useSignUpVm } from "@/hooks/use-sign-up-vm";
 
 /**
@@ -13,15 +13,15 @@ export default function SignUpPage() {
   const vm = useSignUpVm();
 
   return (
-    <SignIn
-      mode="sign-up"
+    <SignUp
       isPending={vm.isPending}
       errorMessage={vm.errorMessage}
       onGoogleSignIn={vm.actions.signInWithGoogle}
-      onEmailSubmit={({ email, password, name }) =>
+      onLinkedInSignIn={vm.actions.signInWithLinkedIn}
+      onEmailSignUp={({ email, password, name }) =>
         vm.actions.signUpWithEmail({ email, password, name })
       }
-      onSwitchMode={vm.actions.goToLogin}
+      onSignIn={vm.actions.goToLogin}
     />
   );
 }

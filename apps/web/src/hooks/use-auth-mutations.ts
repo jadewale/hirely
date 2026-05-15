@@ -53,10 +53,17 @@ export function useAuthMutations(opts: UseAuthMutationsOptions = {}) {
   const { onAuthenticated, googleCallbackPath = "/dashboard" } = opts;
 
   const signInEmail = useMutation({
-    mutationFn: async (vars: { email: string; password: string }) => {
+    mutationFn: async (vars: {
+      email: string;
+      password: string;
+      rememberMe?: boolean;
+    }) => {
       const result = (await authClient.signIn.email({
         email: vars.email,
         password: vars.password,
+        // Better Auth uses this to extend the session cookie's max-age past
+        // the default session window. Defaults to false on the server.
+        rememberMe: vars.rememberMe ?? false,
       })) as BetterAuthResult;
       unwrap(result, "Sign in failed. Please try again.");
     },

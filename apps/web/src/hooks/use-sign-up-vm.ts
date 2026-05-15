@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import { useSession } from "@/lib/auth-client";
 import { useAuthMutations } from "@/hooks/use-auth-mutations";
@@ -33,6 +34,8 @@ export function useSignUpVm() {
   const actions = React.useMemo(
     () => ({
       signInWithGoogle: () => auth.signInGoogle.mutate(),
+      signInWithLinkedIn: () =>
+        toast.info("LinkedIn sign-in is coming soon — use Google for now."),
       signUpWithEmail: (vars: {
         email: string;
         password: string;

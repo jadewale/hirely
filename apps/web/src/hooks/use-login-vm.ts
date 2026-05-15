@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import { useSession } from "@/lib/auth-client";
 import { useAuthMutations } from "@/hooks/use-auth-mutations";
@@ -10,9 +11,9 @@ import { useAuthMutations } from "@/hooks/use-auth-mutations";
  * ViewModel for `/login`.
  *
  * Returning users bounce straight to `/dashboard` on a successful sign-in
- * or once an existing session is detected. The "Create account" link in
- * the view jumps to `/sign-up` -- that's a navigation action exposed here
- * so the View stays presentational.
+ * or once an existing session is detected. The "Create one" link in the
+ * header jumps to `/sign-up`; "Forgot password?" toasts a placeholder
+ * until that route ships.
  *
  * The "already signed in" redirect is the one place we can't avoid an
  * effect: there's no React-render-friendly way to call `router.replace()`.
@@ -37,10 +38,18 @@ export function useLoginVm() {
   const actions = React.useMemo(
     () => ({
       signInWithGoogle: () => auth.signInGoogle.mutate(),
-      signInWithEmail: (vars: { email: string; password: string }) =>
-        auth.signInEmail.mutate(vars),
+      signInWithLinkedIn: () =>
+        toast.info("LinkedIn sign-in is coming soon — use Google for now."),
+      signInWithEmail: (vars: {
+        email: string;
+        password: string;
+        rememberMe?: boolean;
+      }) => auth.signInEmail.mutate(vars),
       goToSignUp: () => router.push("/sign-up"),
-      goToForgotPassword: () => router.push("/login?forgot=1"),
+      goToForgotPassword: () =>
+        toast.info(
+          "Password reset is coming soon — reach out at help@mindoutreach.com for now.",
+        ),
     }),
     [auth, router],
   );

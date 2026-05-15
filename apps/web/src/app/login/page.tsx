@@ -15,14 +15,18 @@ export default function LoginPage() {
 
   return (
     <SignIn
-      mode="sign-in"
       isPending={vm.isPending}
       errorMessage={vm.errorMessage}
       onGoogleSignIn={vm.actions.signInWithGoogle}
-      onEmailSubmit={({ email, password }) =>
-        vm.actions.signInWithEmail({ email, password })
+      onLinkedInSignIn={vm.actions.signInWithLinkedIn}
+      onEmailSignIn={({ email, password, remember }) =>
+        vm.actions.signInWithEmail({
+          email,
+          password,
+          rememberMe: remember,
+        })
       }
-      onSwitchMode={vm.actions.goToSignUp}
+      onCreateAccount={vm.actions.goToSignUp}
       onForgotPassword={vm.actions.goToForgotPassword}
     />
   );

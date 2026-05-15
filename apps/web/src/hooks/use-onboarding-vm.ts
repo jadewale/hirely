@@ -2,30 +2,25 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import { useSession } from "@/lib/auth-client";
 import { useAuthMutations } from "@/hooks/use-auth-mutations";
 
 export type OnboardingStep = "sign-in" | "connect" | "scanning" | "reveal";
-export type AuthMode = "sign-in" | "sign-up";
 
 interface State {
   step: OnboardingStep;
-  mode: AuthMode;
 }
 
-type Action =
-  | { type: "advance"; to: OnboardingStep }
-  | { type: "toggle-mode" };
+type Action = { type: "advance"; to: OnboardingStep };
 
 function reducer(s: State, a: Action): State {
   switch (a.type) {
     case "advance":
       return { ...s, step: a.to };
-    case "toggle-mode":
-      return { ...s, mode: s.mode === "sign-in" ? "sign-up" : "sign-in" };
     default: {
-      const exhaustive: never = a;
+      const exhaustive: never = a.type;
       return exhaustive;
     }
   }
@@ -41,14 +36,14 @@ function reducer(s: State, a: Action): State {
  * `effectiveStep` is *derived* (not stored) so a session that arrives mid-
  * flow (cookie restore, Google round-trip) jumps the user straight to
  * "connect" without a `setState`-in-effect render loop.
+ *
+ * Sign-up has its own `/sign-up` route now, so this orchestrator only
+ * handles sign-in for step 1.
  */
 export function useOnboardingVm() {
   const router = useRouter();
   const { data: session, isPending: sessionPending } = useSession();
-  const [{ step, mode }, dispatch] = React.useReducer(reducer, {
-    step: "sign-in",
-    mode: "sign-up",
-  });
+  const [{ step }, dispatch] = React.useReducer(reducer, { step: "sign-in" });
 
   const auth = useAuthMutations({ googleCallbackPath: "/onboarding" });
 
@@ -69,26 +64,25 @@ export function useOnboardingVm() {
 
   const actions = React.useMemo(
     () => ({
-      toggleMode: () => dispatch({ type: "toggle-mode" }),
       advanceTo: (to: OnboardingStep) => dispatch({ type: "advance", to }),
       goToDashboard: () => router.push("/dashboard"),
       goToTour: () => router.push("/dashboard?tour=1"),
       goToLogin: () => router.push("/login"),
+      goToSignUp: () => router.push("/sign-up"),
       signInWithGoogle: () => auth.signInGoogle.mutate(),
-      signInWithEmail: (vars: { email: string; password: string }) =>
-        auth.signInEmail.mutate(vars),
-      signUpWithEmail: (vars: {
+      signInWithLinkedIn: () =>
+        toast.info("LinkedIn sign-in is coming soon — use Google for now."),
+      signInWithEmail: (vars: {
         email: string;
         password: string;
-        name: string;
-      }) => auth.signUpEmail.mutate(vars),
+        rememberMe?: boolean;
+      }) => auth.signInEmail.mutate(vars),
     }),
     [router, auth],
   );
 
   return {
     effectiveStep,
-    mode,
     session,
     isPending: auth.isPending,
     errorMessage: auth.errorMessage,

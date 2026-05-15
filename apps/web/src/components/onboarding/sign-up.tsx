@@ -4,7 +4,6 @@ import * as React from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -12,39 +11,24 @@ import { cn } from "@/lib/utils";
 
 import { GoogleG, HirelyBrand } from "./_shared";
 
-export interface SignInProps {
-  /** Click handler for "Continue with Google" — the primary social CTA. */
+export interface SignUpProps {
+  /** Click handler for the primary "Continue with Google" CTA. */
   onGoogleSignIn?: () => void;
   /** Click handler for "Continue with LinkedIn". */
   onLinkedInSignIn?: () => void;
-  /** Submit handler for the email + password form. */
-  onEmailSignIn?: (input: {
+  /** Submit handler for the email + password + name form. */
+  onEmailSignUp?: (input: {
     email: string;
     password: string;
-    remember: boolean;
+    name: string;
   }) => void;
-  /** Click handler for the "Create one" link in the header. */
-  onCreateAccount?: () => void;
-  /** Click handler for the "Forgot password?" link above the password field. */
-  onForgotPassword?: () => void;
-  /** Disables all auth buttons + spins the submit label while a request runs. */
+  /** Click handler for the "Sign in" link in the header. */
+  onSignIn?: () => void;
+  /** Disables auth buttons + spins the submit label while a request runs. */
   isPending?: boolean;
   /** Destructive alert above the form when set. */
   errorMessage?: string | null;
-  /** Pre-fill the email field (e.g. when bouncing from sign-up → sign-in). */
-  defaultEmail?: string;
 }
-
-const TRUSTED_LOGOS = [
-  { name: "Stripe", hue: 268 },
-  { name: "Linear", hue: 250 },
-  { name: "Notion", hue: 0 },
-  { name: "Figma", hue: 320 },
-  { name: "Vercel", hue: 20 },
-  { name: "Anthropic", hue: 30 },
-  { name: "Ramp", hue: 140 },
-  { name: "Plaid", hue: 200 },
-];
 
 const FACE_PILE = [
   { hue: 140, init: "JK" },
@@ -69,25 +53,23 @@ function LinkedInIcon({ size = 18 }: { size?: number }) {
 }
 
 /**
- * Sign-in surface.
+ * Sign-up surface.
  *
- * Split-panel layout: left is marketing/social-proof, right is the auth
- * card. Sign-up lives at `/sign-up` and is accessed via the "Create one"
- * link in the header.
+ * Mirrors the sign-in split-panel layout for visual continuity — the
+ * differences are the title, the name field, the submit-button copy, and
+ * the header link pointing back to `/login`.
  */
-export function SignIn({
+export function SignUp({
   onGoogleSignIn,
   onLinkedInSignIn,
-  onEmailSignIn,
-  onCreateAccount,
-  onForgotPassword,
+  onEmailSignUp,
+  onSignIn,
   isPending = false,
   errorMessage,
-  defaultEmail = "",
-}: SignInProps) {
-  const [email, setEmail] = React.useState(defaultEmail);
+}: SignUpProps) {
+  const [name, setName] = React.useState("");
+  const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
-  const [remember, setRemember] = React.useState(false);
 
   return (
     <div className="grid min-h-screen grid-cols-1 bg-background text-foreground lg:grid-cols-[1.05fr_1fr]">
@@ -146,28 +128,6 @@ export function SignIn({
               interviews 1.8&times; faster with Hirely.
             </div>
           </div>
-
-          <div>
-            <div className="mb-2.5 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-              Used to apply at
-            </div>
-            <div className="grid grid-cols-4 gap-2">
-              {TRUSTED_LOGOS.map((t) => (
-                <div
-                  key={t.name}
-                  className="flex items-center justify-center gap-1.5 rounded-lg border border-indigo-200/70 bg-white px-2 py-2.5 dark:border-indigo-500/20 dark:bg-indigo-950/60"
-                >
-                  <div
-                    className="h-4 w-4 shrink-0 rounded-sm"
-                    style={{ background: `oklch(0.72 0.13 ${t.hue})` }}
-                  />
-                  <span className="text-xs font-semibold tracking-tight">
-                    {t.name}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
         <div className="relative mt-4 text-[11px] text-muted-foreground">
@@ -178,23 +138,24 @@ export function SignIn({
       {/* ── RIGHT PANEL ────────────────────────────────────────── */}
       <div className="relative flex flex-col">
         <header className="flex items-center justify-end gap-1.5 px-6 py-6 text-xs text-muted-foreground md:px-12 md:text-sm">
-          Don&apos;t have an account?
+          Already have an account?
           <button
             type="button"
-            onClick={onCreateAccount}
+            onClick={onSignIn}
             className="cursor-pointer font-semibold text-indigo-600 hover:underline dark:text-indigo-400"
           >
-            Create one
+            Sign in
           </button>
         </header>
 
         <div className="flex flex-1 items-center justify-center px-6 pb-12 md:px-12">
           <div className="w-full max-w-sm">
             <h2 className="text-[28px] font-bold leading-tight tracking-tight md:text-[30px]">
-              Sign in to Hirely
+              Create your account
             </h2>
             <p className="mt-1.5 text-[13px] text-muted-foreground">
-              Use the email that owns your job-search inbox.
+              Use the email that owns your job-search inbox — you&apos;ll
+              connect Gmail in the next step.
             </p>
 
             <Button
@@ -241,18 +202,36 @@ export function SignIn({
               className="space-y-3.5"
               onSubmit={(e) => {
                 e.preventDefault();
-                onEmailSignIn?.({ email, password, remember });
+                onEmailSignUp?.({ email, password, name });
               }}
             >
               <div className="space-y-1.5">
                 <Label
-                  htmlFor="signin-email"
+                  htmlFor="signup-name"
+                  className="text-[12.5px] font-semibold"
+                >
+                  Full name
+                </Label>
+                <Input
+                  id="signup-name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  autoComplete="name"
+                  placeholder="Alex Rivera"
+                  className="h-11"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="signup-email"
                   className="text-[12.5px] font-semibold"
                 >
                   Email address
                 </Label>
                 <Input
-                  id="signin-email"
+                  id="signup-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -263,40 +242,24 @@ export function SignIn({
               </div>
 
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <Label
-                    htmlFor="signin-password"
-                    className="text-[12.5px] font-semibold"
-                  >
-                    Password
-                  </Label>
-                  <button
-                    type="button"
-                    onClick={onForgotPassword}
-                    className="cursor-pointer text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
-                  >
-                    Forgot password?
-                  </button>
-                </div>
+                <Label
+                  htmlFor="signup-password"
+                  className="text-[12.5px] font-semibold"
+                >
+                  Password
+                </Label>
                 <Input
-                  id="signin-password"
+                  id="signup-password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
-                  placeholder="••••••••••"
+                  autoComplete="new-password"
+                  minLength={8}
                   required
+                  placeholder="At least 8 characters"
                   className="h-11"
                 />
               </div>
-
-              <label className="flex cursor-pointer items-center gap-2 pt-1 text-[12.5px] text-foreground/80">
-                <Checkbox
-                  checked={remember}
-                  onCheckedChange={(v) => setRemember(v === true)}
-                />
-                Remember this device
-              </label>
 
               <Button
                 type="submit"
@@ -304,12 +267,12 @@ export function SignIn({
                 disabled={isPending}
                 className="mt-2 h-12 w-full rounded-full bg-indigo-600 text-[14px] font-semibold shadow-lg shadow-indigo-600/25 hover:bg-indigo-700"
               >
-                {isPending ? "Signing in…" : "Sign in"}
+                {isPending ? "Creating account…" : "Create account"}
               </Button>
             </form>
 
             <p className="mt-4 text-center text-[11px] leading-relaxed text-muted-foreground">
-              By signing in you agree to our{" "}
+              By creating an account you agree to our{" "}
               <a className="cursor-pointer underline underline-offset-2 hover:text-foreground">
                 Terms
               </a>{" "}
