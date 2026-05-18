@@ -5,6 +5,7 @@ import { DbModule } from './db/db.module';
 import { EmailModule } from './email/email.module';
 import { HealthModule } from './health/health.module';
 import { HttpModule } from './http/http.module';
+import { GoogleModule } from './integrations/google/google.module';
 import { auth } from './lib/auth';
 import { McpModule } from './mcp/mcp.module';
 
@@ -27,6 +28,7 @@ import { McpModule } from './mcp/mcp.module';
     HttpModule,
     EmailModule,
     HealthModule,
+    GoogleModule,
     McpModule,
   ],
 })

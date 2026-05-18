@@ -13,7 +13,8 @@ import { Logger } from '@nestjs/common';
 import { db } from '../db';
 import { getEmailProvider } from '../email/email.factory';
 import { inngest } from '../inngest/client';
-import { userCreated } from '../inngest/events';
+import { integrationsInboxConnected, userCreated } from '../inngest/events';
+import { hasGmailScopes } from '../integrations/google/scopes';
 import { resetPasswordEmail, verificationEmail } from './auth-emails';
 import { parseOrigins } from './origins';
 
@@ -52,6 +53,39 @@ const webOrigins = parseOrigins(
 );
 const webOrigin = webOrigins[0] ?? 'http://localhost:3000';
 const emailVerificationCallbackURL = `${webOrigin}/onboarding`;
+
+/**
+ * Emits `integrations/inbox.connected` iff the account row has every
+ * Gmail scope Hirely requests. Fires from both `account.create.after`
+ * (initial OAuth) and `account.update.after` (linkSocial scope upgrade,
+ * token refresh).
+ *
+ * Idempotent at the Inngest dedupe layer via a deterministic event id —
+ * the token-refresh path will call this hundreds of times over a user's
+ * lifetime; we want at most one nudge cancellation per Google account.
+ */
+async function emitInboxIfGranted(acct: {
+  userId: string;
+  providerId: string;
+  scope?: string | null;
+}): Promise<void> {
+  if (acct.providerId !== 'google') return;
+  if (!hasGmailScopes(acct.scope ?? null)) return;
+  try {
+    await inngest.send(
+      integrationsInboxConnected.create(
+        { userId: acct.userId, provider: 'google' },
+        { id: `integrations-inbox-connected-${acct.userId}-google` },
+      ),
+    );
+  } catch (err) {
+    onboardingLogger.error(
+      `inngest.send('integrations/inbox.connected') failed for user ${acct.userId}: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
+}
 
 export const auth = betterAuth({
   appName: 'Hirely',
@@ -136,6 +170,21 @@ export const auth = betterAuth({
           }
         },
       },
+    },
+    // Fires every time Better Auth touches the `account` row: initial
+    // OAuth sign-in, `linkSocial` scope upgrades, and silent token
+    // refreshes. We watch the `scope` field for Gmail scopes; the
+    // moment they appear we emit `integrations/inbox.connected` so
+    // Inngest cancels the 5-day "connect your inbox" nudge.
+    //
+    // Idempotency: the event id is `integrations-inbox-connected-${userId}-google`,
+    // so the dozens of refresh-token-driven re-fires this hook will see
+    // over a user's lifetime collapse into a single Inngest event at
+    // the dedupe layer. Calendar gets a sibling event later — for now
+    // it rides on the same scope-grant since we ask for both at once.
+    account: {
+      create: { after: async (acct) => emitInboxIfGranted(acct) },
+      update: { after: async (acct) => emitInboxIfGranted(acct) },
     },
   },
   socialProviders: {

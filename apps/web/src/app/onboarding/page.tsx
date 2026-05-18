@@ -45,10 +45,12 @@ export default function OnboardingPage() {
     return (
       <GmailConnect
         userEmail={vm.session?.user?.email}
-        // TODO: kick off the Gmail OAuth scope-request here. For now we
-        // advance straight to the scanning screen so designers can click
-        // through the rest of the flow.
-        onAuthorize={() => vm.actions.advanceTo("scanning")}
+        isPending={vm.isPending}
+        // Real Google OAuth scope-upgrade flow: the browser is
+        // redirected to Google's consent screen, then back to
+        // /onboarding. The VM's googleStatus query refetches and the
+        // step machine derives "scanning" from inboxConnected = true.
+        onAuthorize={vm.actions.connectGoogle}
         onSkip={vm.actions.goToDashboard}
         onSwitchAccount={vm.actions.goToLogin}
       />

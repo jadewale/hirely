@@ -4,8 +4,10 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { useSession } from "@/lib/auth-client";
 import { useAuthMutations } from "@/hooks/use-auth-mutations";
+import { useGoogleConnect } from "@/hooks/use-google-connect";
+import { useGoogleStatus } from "@/hooks/use-google-status";
+import { useSession } from "@/lib/auth-client";
 
 export type OnboardingStep = "sign-in" | "connect" | "scanning" | "reveal";
 
@@ -29,16 +31,21 @@ function reducer(s: State, a: Action): State {
 /**
  * ViewModel for the `/onboarding` orchestrator.
  *
- * Owns the step machine (via `useReducer`) and composes the session + auth
- * mutation hooks. The page component renders the right step based on
- * `effectiveStep` and forwards `actions` to the child components.
+ * Owns the step machine (via `useReducer`) and composes the session +
+ * auth mutation hooks. The page component renders the right step based
+ * on `effectiveStep` and forwards `actions` to the child components.
  *
- * `effectiveStep` is *derived* (not stored) so a session that arrives mid-
- * flow (cookie restore, Google round-trip) jumps the user straight to
- * "connect" without a `setState`-in-effect render loop.
+ * Step derivation rules:
+ *   - No session                       → "sign-in"
+ *   - Session, no Gmail scopes         → "connect"
+ *   - Session + Gmail scopes granted   → "scanning" (auto-advances)
+ *   - Explicitly advanced past scanning → "reveal"
  *
- * Sign-up has its own `/sign-up` route now, so this orchestrator only
- * handles sign-in for step 1.
+ * Inbox status is read from `/api/integrations/google/status` via
+ * TanStack Query. The status query is invalidated by `useGoogleConnect`
+ * on its way out, so when the user lands back from Google's OAuth
+ * round-trip the refetched status flips inboxConnected to true and the
+ * step derivation moves to "scanning" without any explicit dispatch.
  */
 export function useOnboardingVm() {
   const router = useRouter();
@@ -46,9 +53,20 @@ export function useOnboardingVm() {
   const [{ step }, dispatch] = React.useReducer(reducer, { step: "sign-in" });
 
   const auth = useAuthMutations({ googleCallbackPath: "/onboarding" });
+  const googleConnect = useGoogleConnect({ callbackPath: "/onboarding" });
+  const googleStatus = useGoogleStatus({
+    enabled: !sessionPending && !!session,
+  });
 
-  const effectiveStep: OnboardingStep =
-    !sessionPending && session && step === "sign-in" ? "connect" : step;
+  const inboxConnected = googleStatus.data?.inboxConnected ?? false;
+
+  const effectiveStep: OnboardingStep = (() => {
+    if (sessionPending) return step;
+    if (!session) return "sign-in";
+    if (step === "reveal") return "reveal";
+    if (step === "scanning") return "scanning";
+    return inboxConnected ? "scanning" : "connect";
+  })();
 
   // setState inside the *callback* of setTimeout doesn't run synchronously
   // in the effect body, so it doesn't trip react-hooks/set-state-in-effect.
@@ -77,15 +95,17 @@ export function useOnboardingVm() {
         password: string;
         rememberMe?: boolean;
       }) => auth.signInEmail.mutate(vars),
+      connectGoogle: () => googleConnect.mutate(),
     }),
-    [router, auth],
+    [router, auth, googleConnect],
   );
 
   return {
     effectiveStep,
     session,
-    isPending: auth.isPending,
+    isPending: auth.isPending || googleConnect.isPending,
     errorMessage: auth.errorMessage,
+    googleStatus: googleStatus.data,
     actions,
   };
 }

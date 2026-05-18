@@ -42,16 +42,16 @@ const PERMISSIONS = [
     required: true,
   },
   {
-    emoji: "\u{1F4CE}",
-    title: "Read attachments",
-    body: "Offer letters, calendar invites, take-homes. Only on threads we've classified as job-related.",
-    required: false,
+    emoji: "\u{1F4C5}",
+    title: "See & add calendar events",
+    body: "Detect interview conflicts and drop confirmed interviews onto your calendar. We only touch events Hirely creates.",
+    required: true,
   },
 ];
 
 const STEPS = [
   { n: 1, label: "Account" },
-  { n: 2, label: "Connect Gmail" },
+  { n: 2, label: "Connect Google" },
   { n: 3, label: "Scan inbox" },
   { n: 4, label: "Your pipeline" },
 ];
@@ -94,10 +94,11 @@ export function GmailConnect({
               </div>
               <div>
                 <h2 className="text-xl font-bold tracking-tight md:text-[22px]">
-                  Connect your Gmail
+                  Connect your Google account
                 </h2>
                 <p className="mt-0.5 text-sm text-muted-foreground">
-                  This is the only setup step. After this, Hirely runs itself.
+                  Gmail + Calendar. One consent screen, no more setup &mdash;
+                  Hirely runs itself from here.
                 </p>
               </div>
             </div>
