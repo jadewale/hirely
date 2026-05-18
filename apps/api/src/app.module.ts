@@ -8,6 +8,7 @@ import { HttpModule } from './http/http.module';
 import { GoogleModule } from './integrations/google/google.module';
 import { auth } from './lib/auth';
 import { McpModule } from './mcp/mcp.module';
+import { ThreadsModule } from './threads/threads.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { McpModule } from './mcp/mcp.module';
     EmailModule,
     HealthModule,
     GoogleModule,
+    ThreadsModule,
     McpModule,
   ],
 })

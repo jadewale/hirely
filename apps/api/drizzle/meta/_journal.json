@@ -15,6 +15,13 @@
       "when": 1779133132692,
       "tag": "0001_cynical_vermin",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779134382482,
+      "tag": "0002_moaning_sugar_man",
+      "breakpoints": true
     }
   ]
 }

@@ -96,6 +96,16 @@ export const gmailMessage = pgTable(
     // not yet pushed labels back to Gmail for this thread (Phase 2B).
     appliedLabelIds: jsonb('applied_label_ids').$type<string[] | null>(),
 
+    // Draft state (Phase 2B). idle = user hasn't asked for a draft yet;
+    // pending = an Inngest run is in flight; ready = draftBody/gmailDraftId
+    // are populated and the user can open the draft in Gmail.
+    draftStatus: text('draft_status').default('idle').notNull(),
+    /** Gmail's draft ID; null until status=ready. */
+    gmailDraftId: text('gmail_draft_id'),
+    /** Cached LLM-generated body so the UI can preview before opening Gmail. */
+    draftBody: text('draft_body'),
+    draftedAt: timestamp('drafted_at'),
+
     classifiedAt: timestamp('classified_at').defaultNow().notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at')
@@ -124,6 +134,10 @@ export const gmailMessage = pgTable(
     check(
       'gmail_message_stage_chk',
       sql`${table.stage} IN ('unrelated','applied','phone_screen','interview','offer','rejected','ghosted')`,
+    ),
+    check(
+      'gmail_message_draft_status_chk',
+      sql`${table.draftStatus} IN ('idle','pending','ready','failed')`,
     ),
   ],
 );
@@ -201,3 +215,54 @@ export const inboxScanProgressRelations = relations(
     }),
   }),
 );
+
+/**
+ * Per-user cache of the Gmail label IDs we've created.
+ *
+ * Gmail labels are user-scoped. The first time we want to apply
+ * "Hirely / Interview" to a thread, we have to either find or create
+ * that label in the user's account, which costs one round-trip. Caching
+ * the resulting label ID here means every subsequent apply (and every
+ * subsequent thread in the same scan) is one POST, not three.
+ *
+ * The unique key is (userId, stage). We could also key on the literal
+ * label name string, but `stage` is the contract that drives label
+ * naming -- if we ever rename "Hirely / Interview" to "Hirely / On-site"
+ * we'd want all existing rows to keep pointing at the SAME Gmail label
+ * ID (Gmail labels remember their ID across renames). So we cache by
+ * stage, not name.
+ */
+export const gmailLabel = pgTable(
+  'gmail_label',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    /** Pipeline stage this label corresponds to. */
+    stage: text('stage').notNull(),
+    /** Gmail-assigned label ID, e.g. "Label_123". */
+    gmailLabelId: text('gmail_label_id').notNull(),
+    /** Display name we set when creating, e.g. "Hirely / Interview". */
+    name: text('name').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex('gmail_label_user_stage_uniq').on(table.userId, table.stage),
+    check(
+      'gmail_label_stage_chk',
+      sql`${table.stage} IN ('unrelated','applied','phone_screen','interview','offer','rejected','ghosted')`,
+    ),
+  ],
+);
+
+export const gmailLabelRelations = relations(gmailLabel, ({ one }) => ({
+  user: one(user, {
+    fields: [gmailLabel.userId],
+    references: [user.id],
+  }),
+}));

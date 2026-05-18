@@ -3,6 +3,8 @@
 
 import { helloWorld } from './hello-world';
 import {
+  applyLabelsBatch,
+  draftReplyFn,
   syncInboxBatch,
   syncInboxInitial,
   syncInboxProgress,
@@ -21,4 +23,6 @@ export const functions = [
   syncInboxInitial,
   syncInboxBatch,
   syncInboxProgress,
+  applyLabelsBatch,
+  draftReplyFn,
 ];

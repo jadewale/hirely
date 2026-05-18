@@ -107,6 +107,13 @@ export const inboxScanBatchClassified = eventType(
       batchIndex: number;
       batchesTotal: number;
       classifiedCount: number;
+      /**
+       * Just the Gmail message IDs that were classified in this batch.
+       * Carried on the event so the labels-batch consumer doesn't have
+       * to re-query the DB for them. 40 IDs * ~20 chars = ~1 KB; well
+       * under Inngest's per-event size cap.
+       */
+      gmailMessageIds: string[];
     }>(),
   },
 );
@@ -121,3 +128,31 @@ export const inboxScanCompleted = eventType(
     }>(),
   },
 );
+
+// ─── Drafts ──────────────────────────────────────────────────────────
+//
+// Per-thread draft requested by a user click in the Hirely UI. The HTTP
+// controller emits this; the Inngest worker (draft-reply.ts) does the
+// LLM call + Gmail draft creation. We split so the user gets an
+// immediate 202 from the controller and the slower work runs in the
+// background -- the UI polls a per-message `draft_status` column to
+// know when the draft is ready.
+
+export const threadsDraftRequested = eventType(
+  'threads/draft.requested',
+  {
+    schema: staticSchema<{
+      userId: string;
+      /** Our internal gmailMessage.id (UUID), not the Gmail message id. */
+      gmailMessageRowId: string;
+    }>(),
+  },
+);
+
+export const threadsDraftReady = eventType('threads/draft.ready', {
+  schema: staticSchema<{
+    userId: string;
+    gmailMessageRowId: string;
+    gmailDraftId: string;
+  }>(),
+});

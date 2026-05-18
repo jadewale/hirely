@@ -134,6 +134,9 @@ export const syncInboxBatch = inngest.createFunction(
             batchIndex,
             batchesTotal,
             classifiedCount: persistedCount,
+            // Pass the IDs along so consumers (apply-labels-batch) can
+            // act on this specific batch's rows without re-querying.
+            gmailMessageIds: rows.map((r) => r.gmailMessageId),
           },
           { id: `${runId}-batch-${batchIndex}-classified` },
         ),

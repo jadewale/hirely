@@ -43,6 +43,32 @@ export const SYNC_INBOX_PROGRESS = {
   },
 } as const;
 
+export const APPLY_LABELS_BATCH = {
+  id: 'apply-labels-batch',
+  name: 'Inbox sync: apply Hirely labels to a classified batch',
+  steps: {
+    loadAccount: 'load-account',
+    loadRows: 'load-rows',
+    ensureLabels: 'ensure-labels',
+    applyLabels: 'apply-labels',
+    persistLabelIds: 'persist-label-ids',
+  },
+} as const;
+
+export const DRAFT_REPLY = {
+  id: 'draft-reply',
+  name: 'Threads: generate a reply draft in Gmail Drafts',
+  steps: {
+    loadRow: 'load-row',
+    loadAccount: 'load-account',
+    fetchOriginal: 'fetch-original-message',
+    generateBody: 'generate-reply-body',
+    createDraft: 'create-gmail-draft',
+    persistDraft: 'persist-draft-state',
+    notify: 'emit-draft-ready',
+  },
+} as const;
+
 /**
  * How many messages we attempt to backfill on the very first connect.
  *

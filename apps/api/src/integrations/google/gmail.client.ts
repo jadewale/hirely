@@ -178,6 +178,166 @@ export async function batchGetMessages(
   return Promise.all(messageIds.map((id) => getMessage(accessToken, id)));
 }
 
+// ─── Labels (gmail.labels + gmail.modify) ───────────────────────────
+
+export interface GmailLabel {
+  id: string;
+  name: string;
+}
+
+/**
+ * Lists ALL user labels (system + user-created).
+ *
+ * We call this once per user per scan to find existing Hirely labels.
+ * Gmail caps user labels at 10,000 per account; the JSON returned is
+ * cheap (a handful of KB even for power users) so a full list is fine.
+ */
+export async function listLabels(accessToken: string): Promise<GmailLabel[]> {
+  const res = await fetch(`${GMAIL_BASE}/users/me/labels`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  await throwGmailError(res);
+  const json = (await res.json()) as {
+    labels?: { id: string; name: string; type?: string }[];
+  };
+  return (json.labels ?? []).map((l) => ({ id: l.id, name: l.name }));
+}
+
+/**
+ * Creates a user-visible label.
+ *
+ * `labelListVisibility: labelShow` makes the label appear in Gmail's
+ * left rail (so the user sees "Hirely" + its children when they open
+ * Gmail). `messageListVisibility: show` makes the label show on
+ * message-list rows. These are the defaults you'd pick in the Gmail
+ * UI when manually creating a label.
+ */
+export async function createLabel(
+  accessToken: string,
+  name: string,
+): Promise<GmailLabel> {
+  const res = await fetch(`${GMAIL_BASE}/users/me/labels`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name,
+      labelListVisibility: 'labelShow',
+      messageListVisibility: 'show',
+    }),
+  });
+  // Gmail returns 409 if a label with this name already exists. The
+  // caller can recover by re-listing labels -- not our problem here.
+  await throwGmailError(res);
+  const json = (await res.json()) as { id: string; name: string };
+  return { id: json.id, name: json.name };
+}
+
+/**
+ * Adds/removes labels from a message. We always use this for both
+ * adding the Hirely/<stage> label and (optionally) marking
+ * INBOX/UNREAD as removed. Gmail accepts both add and remove in the
+ * same call so the apply is atomic from the user's perspective.
+ */
+export async function modifyMessageLabels(
+  accessToken: string,
+  messageId: string,
+  add: string[],
+  remove: string[] = [],
+): Promise<void> {
+  const res = await fetch(
+    `${GMAIL_BASE}/users/me/messages/${messageId}/modify`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        addLabelIds: add,
+        removeLabelIds: remove,
+      }),
+    },
+  );
+  await throwGmailError(res);
+}
+
+// ─── Drafts (gmail.compose) ────────────────────────────────────────
+
+export interface CreateDraftInput {
+  /** The Gmail thread we're replying within. */
+  threadId: string;
+  /** Recipient address (the recruiter we're replying to). */
+  to: string;
+  /** Subject line. Usually "Re: <original>". */
+  subject: string;
+  /** Plain-text body. */
+  bodyPlain: string;
+  /**
+   * In-Reply-To message ID. Gmail uses this + threadId to thread the
+   * draft properly; without it the draft shows up as a NEW conversation
+   * even though we set threadId.
+   */
+  inReplyToMessageId: string;
+}
+
+export interface CreateDraftResult {
+  /** Gmail's draft ID. Stable; usable as a deep link. */
+  draftId: string;
+  /** The draft's underlying message ID (different from draftId). */
+  messageId: string;
+}
+
+/**
+ * Creates a draft in the user's Drafts folder.
+ *
+ * Hirely NEVER calls Gmail's send endpoint. The draft is placed in the
+ * user's Drafts folder and they decide whether to send. Important to
+ * keep in mind for verification: gmail.send is intentionally not in
+ * our scope set, so even if we wanted to send programmatically we
+ * couldn't.
+ */
+export async function createDraft(
+  accessToken: string,
+  input: CreateDraftInput,
+): Promise<CreateDraftResult> {
+  // Gmail's draft API wants a raw RFC 2822 message base64url-encoded.
+  // We construct the bare minimum: To, Subject, In-Reply-To,
+  // References (so threading works), and the body.
+  const headers = [
+    `To: ${input.to}`,
+    `Subject: ${input.subject}`,
+    `In-Reply-To: ${input.inReplyToMessageId}`,
+    `References: ${input.inReplyToMessageId}`,
+    'Content-Type: text/plain; charset="UTF-8"',
+    'MIME-Version: 1.0',
+  ];
+  const rfc822 = `${headers.join('\r\n')}\r\n\r\n${input.bodyPlain}`;
+  const raw = base64UrlEncode(rfc822);
+
+  const res = await fetch(`${GMAIL_BASE}/users/me/drafts`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      message: {
+        threadId: input.threadId,
+        raw,
+      },
+    }),
+  });
+  await throwGmailError(res);
+  const json = (await res.json()) as {
+    id: string;
+    message: { id: string };
+  };
+  return { draftId: json.id, messageId: json.message.id };
+}
+
 // ─── internal helpers ────────────────────────────────────────────────
 
 async function throwGmailError(res: Response): Promise<void> {
@@ -269,4 +429,16 @@ function base64UrlDecode(input: string): string {
   } catch {
     return '';
   }
+}
+
+/**
+ * Inverse of base64UrlDecode. Gmail's draft API takes the raw RFC822
+ * MIME bytes URL-safe-base64-encoded without padding.
+ */
+function base64UrlEncode(input: string): string {
+  return Buffer.from(input, 'utf-8')
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 }
