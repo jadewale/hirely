@@ -4,6 +4,7 @@
 import { helloWorld } from './hello-world';
 import {
   applyLabelsBatch,
+  cleanupGoogleData,
   draftReplyFn,
   syncInboxBatch,
   syncInboxInitial,
@@ -25,4 +26,5 @@ export const functions = [
   syncInboxProgress,
   applyLabelsBatch,
   draftReplyFn,
+  cleanupGoogleData,
 ];

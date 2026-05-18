@@ -156,3 +156,20 @@ export const threadsDraftReady = eventType('threads/draft.ready', {
     gmailDraftId: string;
   }>(),
 });
+
+// ─── Google disconnect ──────────────────────────────────────────────
+//
+// Emitted by the GoogleService.disconnect() endpoint after Google
+// confirms the revoke. Triggers cleanup-google-data, which wipes every
+// row Hirely persisted from the user's Gmail (gmail_message,
+// gmail_label, inbox_scan_progress). Synchronous deletion is the
+// safest answer for "Limited Use" compliance -- once the user revokes
+// we have no business holding the data, and a 24h grace period is hard
+// to justify under review.
+
+export const googleDisconnected = eventType('integrations/google.disconnected', {
+  schema: staticSchema<{
+    userId: string;
+    reason: 'user-initiated' | 'scope-loss' | 'admin-purge';
+  }>(),
+});

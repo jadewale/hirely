@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, HttpCode, Post } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Session, type UserSession } from '@thallesp/nestjs-better-auth';
 
@@ -43,5 +43,19 @@ export class GoogleController {
     @Session() session: UserSession<typeof auth>,
   ): Promise<InboxScanStatusResponseDto> {
     return this.google.getScanStatus(session.user.id);
+  }
+
+  @Post('disconnect')
+  @HttpCode(200)
+  @ApiOperation({
+    operationId: 'disconnectGoogle',
+    summary: "Revoke the user's Google grant and purge all Gmail-derived data",
+    description:
+      "Revokes the OAuth grant at Google, deletes the local account row, and queues an Inngest cleanup that wipes gmail_message + gmail_label + inbox_scan_progress for the user. Idempotent.",
+  })
+  async disconnect(
+    @Session() session: UserSession<typeof auth>,
+  ): Promise<{ revoked: boolean }> {
+    return this.google.disconnect(session.user.id);
   }
 }

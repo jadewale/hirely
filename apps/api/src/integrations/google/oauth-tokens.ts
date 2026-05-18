@@ -34,6 +34,7 @@ import { account } from '../../db/schema';
 const PROVIDER_ID = 'google';
 const REFRESH_BUFFER_MS = 60 * 1000;
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
+const REVOKE_ENDPOINT = 'https://oauth2.googleapis.com/revoke';
 
 export class GoogleAccountNotLinkedError extends Error {
   constructor(userId: string) {
@@ -178,4 +179,49 @@ export async function getValidGoogleAccessToken(
     refreshed: true,
     accountId: row.id,
   };
+}
+
+/**
+ * Revokes the user's Google grant at the provider.
+ *
+ * Calls Google's revoke endpoint with the refresh token (preferred) or
+ * access token. Revoking ONE token of a grant revokes the entire grant
+ * -- after this call no token from this OAuth client will be accepted
+ * for this user until they re-authorize.
+ *
+ * We tolerate "already revoked" responses (400 with
+ * "Token expired or revoked") as success: if the user revoked at
+ * myaccount.google.com first, we still want our disconnect flow to
+ * proceed and clean up local state.
+ */
+export async function revokeGoogleGrant(userId: string): Promise<void> {
+  const rows = await db
+    .select({
+      accessToken: account.accessToken,
+      refreshToken: account.refreshToken,
+    })
+    .from(account)
+    .where(
+      and(eq(account.userId, userId), eq(account.providerId, PROVIDER_ID)),
+    )
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) return; // no grant to revoke -- treat as success
+
+  const token = row.refreshToken ?? row.accessToken;
+  if (!token) return; // no token columns populated; nothing to revoke
+
+  const res = await fetch(REVOKE_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ token }).toString(),
+  });
+
+  if (res.ok) return;
+  // Google returns 400 for already-revoked / expired tokens. That's
+  // fine; the grant is gone either way and downstream cleanup proceeds.
+  const body = await res.text().catch(() => '');
+  if (res.status === 400 && /expired|invalid|revoked/i.test(body)) return;
+  throw new Error(`Google revoke failed: HTTP ${res.status} ${body}`);
 }

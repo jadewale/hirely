@@ -69,6 +69,16 @@ export const DRAFT_REPLY = {
   },
 } as const;
 
+export const CLEANUP_GOOGLE_DATA = {
+  id: 'cleanup-google-data',
+  name: 'Google: wipe Gmail-derived data after disconnect',
+  steps: {
+    deleteMessages: 'delete-gmail-messages',
+    deleteLabels: 'delete-gmail-labels',
+    deleteProgress: 'delete-scan-progress',
+  },
+} as const;
+
 /**
  * How many messages we attempt to backfill on the very first connect.
  *
