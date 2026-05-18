@@ -1,9 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 
 import type { Database } from '../../db';
-import { account } from '../../db/schema';
+import { account, inboxScanProgress } from '../../db/schema';
 import { GoogleStatusResponseDto } from './dto/google-status-response.dto';
+import { InboxScanStatusResponseDto } from './dto/scan-status-response.dto';
 import { hasCalendarScopes, hasGmailScopes } from './scopes';
 
 const PROVIDER_ID = 'google';
@@ -54,6 +55,49 @@ export class GoogleService {
       email: null,
       inboxConnected: hasGmailScopes(row.scope),
       calendarConnected: hasCalendarScopes(row.scope),
+    };
+  }
+
+  /**
+   * Latest inbox-scan progress row for the user.
+   *
+   * Returns an `idle`-status placeholder when no scan has ever started
+   * (avoiding a 404 keeps the frontend polling loop simple: it can
+   * always read .status without branching on HTTP status code first).
+   */
+  async getScanStatus(userId: string): Promise<InboxScanStatusResponseDto> {
+    const rows = await this.db
+      .select()
+      .from(inboxScanProgress)
+      .where(eq(inboxScanProgress.userId, userId))
+      .orderBy(desc(inboxScanProgress.startedAt))
+      .limit(1);
+
+    const row = rows[0];
+    if (!row) {
+      return {
+        status: 'idle',
+        runId: null,
+        targetTotal: 0,
+        discoveredTotal: 0,
+        classifiedCount: 0,
+        batchesTotal: 0,
+        batchesCompleted: 0,
+        completedAt: null,
+        errorMessage: null,
+      };
+    }
+
+    return {
+      status: row.status as InboxScanStatusResponseDto['status'],
+      runId: row.runId,
+      targetTotal: row.targetTotal,
+      discoveredTotal: row.discoveredTotal,
+      classifiedCount: row.classifiedCount,
+      batchesTotal: row.batchesTotal,
+      batchesCompleted: row.batchesCompleted,
+      completedAt: row.completedAt ? row.completedAt.toISOString() : null,
+      errorMessage: row.errorMessage,
     };
   }
 }

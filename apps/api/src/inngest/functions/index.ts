@@ -3,6 +3,11 @@
 
 import { helloWorld } from './hello-world';
 import {
+  syncInboxBatch,
+  syncInboxInitial,
+  syncInboxProgress,
+} from './inbox-sync';
+import {
   onboardingInboxNudge,
   onboardingResumeNudge,
   onboardingWelcome,
@@ -13,4 +18,7 @@ export const functions = [
   onboardingWelcome,
   onboardingInboxNudge,
   onboardingResumeNudge,
+  syncInboxInitial,
+  syncInboxBatch,
+  syncInboxProgress,
 ];

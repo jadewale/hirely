@@ -10,3 +10,4 @@
  * to avoid circular-import surprises.
  */
 export * from './auth';
+export * from './gmail';

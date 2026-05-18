@@ -60,3 +60,64 @@ export const resumesUploaded = eventType('resumes/uploaded', {
 export const demoHelloWorld = eventType('demo/hello.world', {
   schema: staticSchema<{ name?: string }>(),
 });
+
+// ─── Inbox scan pipeline ─────────────────────────────────────────────
+//
+// Two-function fanout that powers the initial 300-message backfill kicked
+// off when a user grants Gmail scopes:
+//
+//   integrations/inbox.connected           (already emitted from auth hook)
+//     └→ fn: sync-inbox-initial
+//          ├→ pages through Gmail (40 IDs at a time, up to 300)
+//          └→ sends one `inbox.scan.batch.requested` per batch
+//
+//   integrations/inbox.scan.batch.requested
+//     └→ fn: sync-inbox-batch       (concurrency-limited)
+//          ├→ batchGet message bodies from Gmail
+//          ├→ classify via OpenAI in one call
+//          ├→ upsert into gmail_message
+//          └→ sends `inbox.scan.batch.classified` (drives progress UI)
+//
+//   integrations/inbox.scan.batch.classified
+//     └→ fn: sync-inbox-progress    (single-flight per scan run)
+//          └→ bumps inbox_scan_progress counters, marks completed if last
+//
+// The runId on every event ties the whole tree back to the row in
+// `inbox_scan_progress` so the frontend can poll one stable identifier.
+
+export const inboxScanBatchRequested = eventType(
+  'integrations/inbox.scan.batch.requested',
+  {
+    schema: staticSchema<{
+      userId: string;
+      runId: string;
+      batchIndex: number;
+      batchesTotal: number;
+      gmailMessageIds: string[];
+    }>(),
+  },
+);
+
+export const inboxScanBatchClassified = eventType(
+  'integrations/inbox.scan.batch.classified',
+  {
+    schema: staticSchema<{
+      userId: string;
+      runId: string;
+      batchIndex: number;
+      batchesTotal: number;
+      classifiedCount: number;
+    }>(),
+  },
+);
+
+export const inboxScanCompleted = eventType(
+  'integrations/inbox.scan.completed',
+  {
+    schema: staticSchema<{
+      userId: string;
+      runId: string;
+      classifiedTotal: number;
+    }>(),
+  },
+);

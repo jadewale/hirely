@@ -222,12 +222,16 @@ export default function PrivacyPage() {
 
       <H2>6. AI and machine learning</H2>
       <P>
-        We use third-party large language models (currently from Anthropic
-        and OpenAI) to classify email content and draft replies. These
-        providers are bound by data processing agreements that prohibit them
-        from retaining your data, training their models on your data, or
-        sharing your data with other customers. We do not use your Gmail or
-        Calendar data to train any model, including any model of our own.
+        We use third-party large language models (currently OpenAI) to
+        classify email content and draft replies. Under OpenAI&rsquo;s
+        published API data policy, content you send via the API is{" "}
+        <em>not</em> used to train OpenAI models, and is retained for up to
+        30 days solely for abuse monitoring before being deleted. We do not
+        use your Gmail or Calendar data to train any model, including any
+        model of our own. If we expand to additional model providers we
+        will only use providers that offer equivalent or stronger
+        retention and training commitments under a written data processing
+        agreement.
       </P>
 
       <H2>7. Sharing your data</H2>
