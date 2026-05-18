@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from '@thallesp/nestjs-better-auth';
+import { CalendarModule } from './calendar/calendar.module';
 import { DbModule } from './db/db.module';
 import { EmailModule } from './email/email.module';
 import { HealthModule } from './health/health.module';
@@ -31,6 +32,7 @@ import { ThreadsModule } from './threads/threads.module';
     HealthModule,
     GoogleModule,
     ThreadsModule,
+    CalendarModule,
     McpModule,
   ],
 })
