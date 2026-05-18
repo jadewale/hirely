@@ -58,7 +58,24 @@ export default function OnboardingPage() {
   }
 
   if (vm.effectiveStep === "scanning") {
-    return <Scanning />;
+    // ETA: ~3s per batch (LLM-bound), bounded by concurrency=3. Rough
+    // formula matches the API's actual behavior closely enough that
+    // the countdown feels honest without us shipping a server-side
+    // ETA endpoint.
+    const scan = vm.scanStatus;
+    const scanned = scan?.classifiedCount ?? 0;
+    const total = scan?.discoveredTotal || scan?.targetTotal || 1;
+    const batchesRemaining = (scan?.batchesTotal ?? 0) -
+      (scan?.batchesCompleted ?? 0);
+    const etaSeconds = Math.max(3, Math.ceil((batchesRemaining * 3) / 3));
+    return (
+      <Scanning
+        scanned={scanned}
+        total={total}
+        etaSeconds={etaSeconds}
+        status={scan?.status}
+      />
+    );
   }
 
   return (

@@ -16,19 +16,47 @@ import {
 import { cn } from "@/lib/utils";
 
 export interface ScanningProps {
-  /** Override progress for testing. Otherwise uses SCAN_PROGRESS from data file. */
+  /**
+   * Live progress from the server. When the prop is omitted (e.g. a
+   * Storybook render), we fall back to the design-time SCAN_PROGRESS
+   * fixture so the layout still tells the story.
+   */
   scanned?: number;
   total?: number;
   etaSeconds?: number;
+  /**
+   * Status from `/api/integrations/google/scan-status`. `listing` shows
+   * the "reading inbox" copy; `classifying` shows "analyzing"; `idle`
+   * (no scan yet) shows a soft "preparing" state.
+   */
+  status?: "idle" | "listing" | "classifying" | "completed" | "failed";
 }
 
 export function Scanning({
   scanned = SCAN_PROGRESS.scanned,
   total = SCAN_PROGRESS.total,
   etaSeconds = SCAN_PROGRESS.etaSeconds,
+  status = "classifying",
 }: ScanningProps) {
-  const pct = Math.round((scanned / total) * 100);
+  const denominator = total > 0 ? total : 1;
+  const pct = Math.min(
+    100,
+    Math.max(0, Math.round((scanned / denominator) * 100)),
+  );
   const maxCount = Math.max(...FOUND_STAGES.map((s) => s.count));
+
+  const headline =
+    status === "listing"
+      ? "Reading your inbox\u2026"
+      : status === "failed"
+        ? "Hmm, the scan hit a snag."
+        : "Analyzing your inbox\u2026";
+  const subhead =
+    status === "listing"
+      ? "Pulling the most recent threads from Gmail."
+      : status === "failed"
+        ? "Try again from your dashboard. Your existing data is untouched."
+        : "Classifying threads from the last 12 months. Personal email is skipped entirely.";
 
   return (
     <div className="relative min-h-screen bg-background text-foreground">
@@ -55,11 +83,10 @@ export function Scanning({
           </div>
 
           <h1 className="mt-4 text-3xl font-bold leading-[1.05] tracking-tight md:text-4xl lg:text-[40px]">
-            Reading your inbox&hellip;
+            {headline}
           </h1>
           <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
-            Classifying threads from the last 12 months. Personal email is
-            skipped entirely. This takes about 60 seconds.
+            {subhead}
           </p>
 
           <div className="mt-7">
@@ -76,7 +103,9 @@ export function Scanning({
               indicatorClassName="bg-indigo-600"
             />
             <div className="mt-2 font-mono text-[11.5px] text-muted-foreground">
-              ~{etaSeconds} seconds remaining
+              {status === "listing"
+                ? "Discovering threads\u2026"
+                : `~${etaSeconds} seconds remaining`}
             </div>
           </div>
 

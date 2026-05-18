@@ -16,8 +16,15 @@ export default function DashboardPage() {
       isLoading={vm.isLoading}
       user={vm.user}
       isSigningOut={vm.isSigningOut}
+      google={vm.google}
+      scan={vm.scan}
+      threads={vm.threads}
+      isLoadingThreads={vm.isLoadingThreads}
+      draftPending={vm.draftPending}
       onSignOut={vm.actions.signOut}
       onRestartOnboarding={vm.actions.restartOnboarding}
+      onRequestDraft={vm.actions.requestDraft}
+      onOpenSettings={vm.actions.openSettings}
     />
   );
 }

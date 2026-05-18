@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useAuthMutations } from "@/hooks/use-auth-mutations";
 import { useGoogleConnect } from "@/hooks/use-google-connect";
 import { useGoogleStatus } from "@/hooks/use-google-status";
+import { useScanStatus } from "@/hooks/use-scan-status";
 import { useSession } from "@/lib/auth-client";
 
 export type OnboardingStep = "sign-in" | "connect" | "scanning" | "reveal";
@@ -68,17 +69,19 @@ export function useOnboardingVm() {
     return inboxConnected ? "scanning" : "connect";
   })();
 
-  // setState inside the *callback* of setTimeout doesn't run synchronously
-  // in the effect body, so it doesn't trip react-hooks/set-state-in-effect.
-  // Replace with a real scan-progress subscription when that ships.
+  // Real scan progress: poll the server while we're on the scanning
+  // step, advance to "reveal" the moment status goes terminal.
+  const scanStatus = useScanStatus({
+    enabled: effectiveStep === "scanning",
+  });
+
   React.useEffect(() => {
     if (effectiveStep !== "scanning") return;
-    const t = setTimeout(
-      () => dispatch({ type: "advance", to: "reveal" }),
-      3500,
-    );
-    return () => clearTimeout(t);
-  }, [effectiveStep]);
+    const status = scanStatus.data?.status;
+    if (status === "completed" || status === "failed") {
+      dispatch({ type: "advance", to: "reveal" });
+    }
+  }, [effectiveStep, scanStatus.data?.status]);
 
   const actions = React.useMemo(
     () => ({
@@ -106,6 +109,7 @@ export function useOnboardingVm() {
     isPending: auth.isPending || googleConnect.isPending,
     errorMessage: auth.errorMessage,
     googleStatus: googleStatus.data,
+    scanStatus: scanStatus.data,
     actions,
   };
 }
