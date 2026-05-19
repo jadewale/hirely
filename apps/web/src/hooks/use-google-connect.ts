@@ -42,11 +42,18 @@ export function useGoogleConnect(opts: { callbackPath?: string } = {}) {
         typeof window === "undefined"
           ? callbackPath
           : `${window.location.origin}${callbackPath}`;
+      // Failure destination. Without this, Better Auth falls back to
+      // BETTER_AUTH_URL (the API origin) on error -- e.g. user cancels
+      // the consent screen, or Google returns a transport error -- and
+      // the user gets the bare Nest 404 page. Landing them back on
+      // /onboarding with `?error=<reason>` lets the page surface a toast.
+      const errorCallbackURL = callbackURL;
 
       const result = (await authClient.linkSocial({
         provider: "google",
         scopes: GOOGLE_INBOX_SCOPES as string[],
         callbackURL,
+        errorCallbackURL,
       })) as BetterAuthResult;
 
       if (result.error) {

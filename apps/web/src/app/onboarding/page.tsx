@@ -1,10 +1,56 @@
 "use client";
 
+import * as React from "react";
+import { toast } from "sonner";
+
 import { FirstReveal } from "@/components/onboarding/first-reveal";
 import { GmailConnect } from "@/components/onboarding/gmail-connect";
 import { Scanning } from "@/components/onboarding/scanning";
 import { SignIn } from "@/components/onboarding/sign-in";
 import { useOnboardingVm } from "@/hooks/use-onboarding-vm";
+
+/**
+ * Friendly copy for the error codes Better Auth surfaces when an OAuth
+ * link/sign-in round-trip fails. The codes are stable identifiers from
+ * Better Auth's error registry. We default to a generic retry message
+ * so we never strand the user on a silent failure -- unknown codes
+ * still get a recoverable nudge.
+ */
+const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  "email_doesn't_match":
+    "That Google account has a different email than your Hirely account. We've enabled mismatched-email linking — try Authorize again.",
+  account_not_linked:
+    "We couldn't link that Google account. Sign in with the email you used originally, then try connecting Google from settings.",
+  access_denied:
+    "You cancelled Google's consent screen. Tap Authorize to try again.",
+  signup_disabled:
+    "Sign-ups are paused right now. Reach out and we'll get you in.",
+};
+
+/**
+ * Reads `?error=<code>` once on mount, fires a toast, and replaces the
+ * URL to clear the param -- otherwise a hard refresh would re-trigger
+ * the toast on every reload. Better Auth points failed OAuth round-trips
+ * at this page via the `errorCallbackURL` we pass in `useGoogleConnect`.
+ */
+function useOAuthErrorToast(): void {
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("error");
+    if (!code) return;
+    toast.error(
+      OAUTH_ERROR_MESSAGES[code] ??
+        "Something went wrong connecting Google. Please try again.",
+    );
+    params.delete("error");
+    const next = params.toString();
+    const url =
+      window.location.pathname + (next ? `?${next}` : "") +
+      window.location.hash;
+    window.history.replaceState({}, "", url);
+  }, []);
+}
 
 /**
  * Onboarding orchestrator (View).
@@ -19,6 +65,7 @@ import { useOnboardingVm } from "@/hooks/use-onboarding-vm";
  * subscription land in follow-up slices.
  */
 export default function OnboardingPage() {
+  useOAuthErrorToast();
   const vm = useOnboardingVm();
 
   if (vm.effectiveStep === "sign-in") {

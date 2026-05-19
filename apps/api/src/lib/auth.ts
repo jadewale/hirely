@@ -197,6 +197,21 @@ export const auth = betterAuth({
         }
       : {}),
   },
+  // Hirely's auth-email and the user's Gmail can legitimately differ
+  // (e.g. signed up as work@company.com, connecting personal@gmail.com).
+  // Without this Better Auth throws `email_doesn't_match` on linkSocial,
+  // sends the user to BETTER_AUTH_URL with `?error=email_doesn't_match`,
+  // and our API root 404s. `trustedProviders: ['google']` additionally
+  // skips the verified-email gate (Google always verifies emails, so this
+  // is a no-op safeguard for the rare future case where Google's response
+  // omits the flag).
+  account: {
+    accountLinking: {
+      enabled: true,
+      trustedProviders: ['google'],
+      allowDifferentEmails: true,
+    },
+  },
   // Better Auth uses this for two things:
   //   1. CSRF protection: rejects POST /api/auth/* requests whose Origin
   //      header isn't in this list.
