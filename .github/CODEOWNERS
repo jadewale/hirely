@@ -1,0 +1,41 @@
+# CODEOWNERS — review ownership for this multi-product monorepo.
+#
+# Two products live here:
+#   - hirely          (apps/api, apps/web)          — outreach / CRM
+#   - career-platform (apps/career-*, packages/career-*) — reverse-recruiting marketplace
+#
+# The last matching pattern wins, so order matters: broad defaults first,
+# product-specific paths after, jointly-owned shared config last.
+#
+# NOTE: this repo (jadewale/hirely) is a personal repo, so only individual
+# usernames work here and CODEOWNERS is advisory (auto-assigns reviewers).
+# When this moves under a GitHub org, swap the @jadewale placeholders for
+# team handles (e.g. @your-org/hirely, @your-org/career) and turn on branch
+# protection with "Require review from Code Owners" to make it a hard gate.
+
+# ── Default owner for everything not matched below ──────────────────────────
+*                               @jadewale
+
+# ── hirely product ──────────────────────────────────────────────────────────
+/apps/api/                      @jadewale   # → @your-org/hirely
+/apps/web/                      @jadewale   # → @your-org/hirely
+
+# ── career-platform product ─────────────────────────────────────────────────
+/apps/career-api/               @jadewale   # → @your-org/career
+/apps/career-web/               @jadewale   # → @your-org/career
+/packages/career-config/        @jadewale   # → @your-org/career
+/packages/career-contracts/     @jadewale   # → @your-org/career
+/packages/career-db/            @jadewale   # → @your-org/career
+/packages/career-testing/       @jadewale   # → @your-org/career
+
+# ── Shared / cross-cutting (jointly owned — change deliberately) ─────────────
+# Root config, shared config packages, and infra affect BOTH products.
+# Requiring both teams here is the guardrail that keeps one team from
+# breaking the other via a root-level change.
+/package.json                   @jadewale   # → @your-org/hirely @your-org/career
+/turbo.json                     @jadewale   # → @your-org/hirely @your-org/career
+/bun.lock                       @jadewale   # → @your-org/hirely @your-org/career
+/.github/                       @jadewale   # → @your-org/hirely @your-org/career
+/packages/eslint-config/        @jadewale   # → @your-org/hirely @your-org/career
+/packages/typescript-config/    @jadewale   # → @your-org/hirely @your-org/career
+/packages/terraform-aws/        @jadewale   # → @your-org/hirely @your-org/career
