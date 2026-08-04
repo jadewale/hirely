@@ -466,16 +466,14 @@ resource "aws_codepipeline" "api" {
           includes = [var.github_branch]
         }
         # Path-filtered so career-only pushes don't rebuild hirely. The career
-        # pipeline (career_cicd.tf) carries the complementary filter. Shared
-        # roots (bun.lock, turbo.json, terraform, .github) are included so a
-        # change to them still rebuilds hirely.
+        # pipeline (career_cicd.tf) carries the complementary filter. AWS caps
+        # this list at 8 items. apps/web (Vercel) and packages/terraform-aws
+        # (infra) are intentionally excluded -- neither changes the API image.
         file_paths {
           includes = [
             "apps/api/**",
-            "apps/web/**",
             "packages/eslint-config/**",
             "packages/typescript-config/**",
-            "packages/terraform-aws/**",
             "bun.lock",
             "turbo.json",
             "package.json",
