@@ -1,0 +1,7 @@
+{
+  "extends": "@career/config/tsconfig/nest.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "baseUrl": "./"
+  }
+}
