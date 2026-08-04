@@ -44,3 +44,22 @@ openai_api_key           = "sk-your-openai-api-key"
 github_repo              = "jadewale/hirely"
 github_branch            = "main"
 codepipeline_enabled     = true
+
+# ── career-platform (second app in this monorepo) ────────────────────────────
+# career-api deploys via its own ECS service + pipeline (career_service.tf /
+# career_cicd.tf), reusing the shared VPC, ECS cluster, and RDS instance.
+career_frontend_url          = "http://localhost:3100"
+# career_api_domain_name     = "api.careerplatform.com"
+# career_web_domain_name     = "app.careerplatform.com"
+career_db_name               = "career"   # create once on the shared RDS: CREATE DATABASE career;
+career_api_cpu               = 512
+career_api_memory            = 1024
+career_api_desired_count     = 1
+
+# Secrets — REPLACE before apply. Generate: openssl rand -base64 64
+career_better_auth_secret    = "replace-with-a-long-random-secret"
+# Optional until the relevant RR ticket lands (default to empty -> stored as "unset"):
+# career_stripe_secret_key     = "sk_live_..."
+# career_stripe_webhook_secret = "whsec_..."
+# career_inngest_signing_key   = "signkey-prod-..."
+# career_inngest_event_key     = "..."
