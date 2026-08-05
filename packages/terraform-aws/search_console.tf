@@ -56,9 +56,9 @@ resource "aws_route53_record" "google_site_verification" {
   # (it's the verified email-sending domain). Reusing it keeps the source
   # of truth in one place instead of introducing a third "base_domain"
   # variable.
-  name    = var.ses_mail_domain
-  type    = "TXT"
-  ttl     = 300
+  name = var.ses_mail_domain
+  type = "TXT"
+  ttl  = 300
 
   records = [
     "google-site-verification=${var.google_site_verification_token}",

@@ -1,0 +1,29 @@
+# CodeBuild — Deploy stage for the career-api pipeline.
+# Renders apps/career-api/taskdef.template.json with the image URI from Build,
+# registers a new ECS task-def revision, rolls the service, and waits for
+# stability. Mirrors the root deployspec.yml.
+#
+# Inputs:
+#   $CODEBUILD_SRC_DIR                 primary input = source_output (the repo)
+#   $CODEBUILD_SRC_DIR_build_output    secondary input = build_output (image_uri.txt)
+#
+# Env vars are injected by Terraform (career_cicd.tf > aws_codebuild_project.career_api_deploy).
+
+version: 0.2
+
+phases:
+  build:
+    commands:
+      - export IMAGE_URI=$(cat "$CODEBUILD_SRC_DIR_build_output/image_uri.txt")
+      - echo "Deploying $IMAGE_URI"
+      - echo "Rendering task definition..."
+      - envsubst < "$CODEBUILD_SRC_DIR/apps/career-api/taskdef.template.json" > taskdef.json
+      - cat taskdef.json
+      - echo "Registering task definition..."
+      - TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://taskdef.json --query 'taskDefinition.taskDefinitionArn' --output text)
+      - echo "Registered $TASK_DEF_ARN"
+      - echo "Updating service..."
+      - aws ecs update-service --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE" --task-definition "$TASK_DEF_ARN" --query 'service.deployments[0].rolloutState' --output text
+      - echo "Waiting for service to stabilize..."
+      - aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
+      - echo "Deploy complete. Running revision $TASK_DEF_ARN"

@@ -20,6 +20,15 @@ COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/eslint-config/package.json packages/eslint-config/package.json
 COPY packages/typescript-config/package.json packages/typescript-config/package.json
+# The career-* workspaces share this monorepo's bun.lock, so their manifests
+# must be present here too or `--frozen-lockfile` resolves a smaller graph than
+# the lockfile records and fails with "lockfile had changes".
+COPY apps/career-api/package.json apps/career-api/package.json
+COPY apps/career-web/package.json apps/career-web/package.json
+COPY packages/career-config/package.json packages/career-config/package.json
+COPY packages/career-contracts/package.json packages/career-contracts/package.json
+COPY packages/career-db/package.json packages/career-db/package.json
+COPY packages/career-testing/package.json packages/career-testing/package.json
 
 RUN bun install --frozen-lockfile --backend=copyfile
 

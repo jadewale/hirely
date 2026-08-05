@@ -1,0 +1,41 @@
+{
+  "family": "${TASK_FAMILY}",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "${API_CPU}",
+  "memory": "${API_MEMORY}",
+  "executionRoleArn": "${EXECUTION_ROLE_ARN}",
+  "taskRoleArn": "${TASK_ROLE_ARN}",
+  "containerDefinitions": [
+    {
+      "name": "career-api",
+      "image": "${IMAGE_URI}",
+      "essential": true,
+      "portMappings": [
+        { "containerPort": ${API_PORT}, "hostPort": ${API_PORT}, "protocol": "tcp" }
+      ],
+      "environment": [
+        { "name": "NODE_ENV", "value": "production" },
+        { "name": "PORT", "value": "${API_PORT}" },
+        { "name": "FRONTEND_URL", "value": "${FRONTEND_URL}" },
+        { "name": "BETTER_AUTH_URL", "value": "${BETTER_AUTH_URL}" }
+      ],
+      "secrets": [
+        { "name": "DATABASE_URL", "valueFrom": "${DATABASE_URL_ARN}" },
+        { "name": "BETTER_AUTH_SECRET", "valueFrom": "${BETTER_AUTH_SECRET_ARN}" },
+        { "name": "STRIPE_SECRET_KEY", "valueFrom": "${STRIPE_SECRET_KEY_ARN}" },
+        { "name": "STRIPE_WEBHOOK_SECRET", "valueFrom": "${STRIPE_WEBHOOK_SECRET_ARN}" },
+        { "name": "INNGEST_SIGNING_KEY", "valueFrom": "${INNGEST_SIGNING_KEY_ARN}" },
+        { "name": "INNGEST_EVENT_KEY", "valueFrom": "${INNGEST_EVENT_KEY_ARN}" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "${LOG_GROUP}",
+          "awslogs-region": "${AWS_DEFAULT_REGION}",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}
