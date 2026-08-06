@@ -23,9 +23,10 @@ COPY packages/career-contracts/package.json packages/career-contracts/package.js
 COPY packages/career-db/package.json packages/career-db/package.json
 COPY packages/career-testing/package.json packages/career-testing/package.json
 RUN bun install --frozen-lockfile --backend=copyfile
-# career-api's tsconfig extends @career/config, so the config package must be
-# present for `nest build` to resolve it.
+# career-api's tsconfig extends @career/config, and it imports @career/db at
+# runtime, so both packages must be present for `nest build` to resolve them.
 COPY packages/career-config packages/career-config
+COPY packages/career-db packages/career-db
 COPY apps/career-api apps/career-api
 RUN bun run --cwd apps/career-api build
 
@@ -40,8 +41,10 @@ COPY --from=builder --chown=appuser:appgroup /app/node_modules ./node_modules
 COPY --from=builder --chown=appuser:appgroup /app/apps/career-api/package.json ./apps/career-api/package.json
 COPY --from=builder --chown=appuser:appgroup /app/apps/career-api/node_modules ./apps/career-api/node_modules
 COPY --from=builder --chown=appuser:appgroup /app/apps/career-api/dist ./apps/career-api/dist
-# NOTE: when RR-003 adds Drizzle, also copy apps/career-api/drizzle (migrations)
-# here, matching apps/api/Dockerfile.
+# @career/db is a runtime dependency (bun runs its TS source), and the workspace
+# symlink in node_modules points here — so ship the package, including its
+# drizzle/ migrations folder.
+COPY --from=builder --chown=appuser:appgroup /app/packages/career-db ./packages/career-db
 WORKDIR /app/apps/career-api
 USER appuser
 EXPOSE 4100

@@ -1,9 +1,13 @@
 /**
  * Database package for the career-platform (Drizzle ORM + PostgreSQL).
  *
- * The Drizzle client, schema, migrations, and health check are configured in
- * RR-003. This package is the ONLY approved entry point to the database:
- * `apps/career-api` (and approved background workflows) may import it;
- * `apps/career-web` must never depend on it.
+ * This is the ONLY approved entry point to the database: `apps/career-api`
+ * (and approved background workflows) may import it; `apps/career-web` must
+ * never depend on it.
+ *
+ * The runtime migrator lives on the `@career/db/migrator` subpath so its
+ * Node-only internals stay out of the app/test import graph.
  */
-export const DB_PACKAGE_VERSION = '0.0.0' as const;
+export { db, pgClient, type Database } from './client';
+export { checkDatabase, type DatabaseHealth } from './health';
+export * as schema from './schema';
