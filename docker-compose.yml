@@ -1,0 +1,28 @@
+# Local development dependencies for the career-platform app.
+#
+#   docker compose up -d career-postgres
+#
+# Exposes Postgres on host port 5433 (not 5432) to avoid clashing with any
+# other local Postgres. Point apps/career-api/.env at it (use 127.0.0.1, not
+# localhost, to avoid IPv6 resolution issues on macOS):
+#   DATABASE_URL=postgres://career:career@127.0.0.1:5433/career
+services:
+  career-postgres:
+    image: postgres:16
+    container_name: career-postgres
+    environment:
+      POSTGRES_USER: career
+      POSTGRES_PASSWORD: career
+      POSTGRES_DB: career
+    ports:
+      - "5433:5432"
+    volumes:
+      - career-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U career -d career"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  career-pgdata:

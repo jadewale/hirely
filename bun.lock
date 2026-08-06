@@ -64,6 +64,7 @@
       "name": "career-api",
       "version": "0.0.1",
       "dependencies": {
+        "@career/db": "workspace:*",
         "@nestjs/common": "^11.0.1",
         "@nestjs/config": "^4.0.4",
         "@nestjs/core": "^11.0.1",
@@ -171,8 +172,14 @@
     "packages/career-db": {
       "name": "@career/db",
       "version": "0.0.0",
+      "dependencies": {
+        "drizzle-orm": "^0.45.2",
+        "postgres": "^3.4.9",
+      },
       "devDependencies": {
         "@career/config": "workspace:*",
+        "@types/node": "^24.0.0",
+        "drizzle-kit": "^0.31.10",
         "typescript": "^5.9.2",
       },
     },
