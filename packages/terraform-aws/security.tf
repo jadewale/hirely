@@ -64,12 +64,16 @@ resource "aws_security_group" "db" {
   description = "Allow Postgres access from ECS tasks"
   vpc_id      = aws_vpc.main.id
 
+  # Both products' ECS services share this RDS instance (separate databases).
+  # These MUST be inline here rather than standalone aws_security_group_rule
+  # resources: this SG manages its ingress inline, so any external rule gets
+  # wiped on the next apply of this resource.
   ingress {
     description     = "Postgres from ECS"
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
-    security_groups = [aws_security_group.ecs_service.id]
+    security_groups = [aws_security_group.ecs_service.id, aws_security_group.career_ecs_service.id]
   }
 
   egress {

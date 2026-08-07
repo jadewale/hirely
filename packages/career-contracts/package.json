@@ -2,7 +2,6 @@
   "name": "@career/contracts",
   "version": "0.0.0",
   "private": true,
-  "type": "module",
   "types": "./src/index.ts",
   "exports": {
     ".": {

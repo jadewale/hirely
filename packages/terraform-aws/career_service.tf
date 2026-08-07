@@ -221,18 +221,10 @@ resource "aws_security_group" "career_ecs_service" {
   tags = merge(local.career_common_tags, { Name = "${local.career_name}-ecs-sg" })
 }
 
-# career-api tasks reach the SHARED Postgres. Rather than widen the existing
-# db security group's inline rules (owned by data_stores/security.tf), attach a
-# standalone ingress rule so the shared SG stays untouched by career.
-resource "aws_security_group_rule" "db_from_career_ecs" {
-  type                     = "ingress"
-  description              = "Postgres from career-api ECS"
-  from_port                = 5432
-  to_port                  = 5432
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.db.id
-  source_security_group_id = aws_security_group.career_ecs_service.id
-}
+# NOTE: career-api's Postgres ingress is granted INLINE on aws_security_group.db
+# in security.tf (its security_groups list includes career_ecs_service). A
+# standalone aws_security_group_rule here would be silently wiped on every apply
+# of that inline-managed SG — the bug that caused career's DB connect timeouts.
 
 # ── Load balancer ────────────────────────────────────────────────────────────
 resource "aws_lb" "career_api" {
