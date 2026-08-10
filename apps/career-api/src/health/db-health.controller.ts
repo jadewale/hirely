@@ -11,10 +11,13 @@ import {
   ApiServiceUnavailableResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import { checkDatabase, type Database } from '@career/db';
 import { DATABASE } from '../db/database.token';
 import { DbHealthResponseDto } from './dto/db-health-response.dto';
 
+// Unauthenticated readiness probe (monitoring target), like the liveness probe.
+@AllowAnonymous()
 @ApiTags('health')
 @Controller('health/db')
 export class DbHealthController {

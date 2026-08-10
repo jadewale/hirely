@@ -7,7 +7,11 @@ import { configureApp } from './bootstrap';
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
 
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // bodyParser: false — AuthModule.forRoot() owns body-parser wiring (its raw
+  // body handling is required for Better Auth). Do NOT re-add parsers here.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bodyParser: false,
+  });
 
   configureApp(app);
 
