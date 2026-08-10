@@ -9,7 +9,7 @@
  * (unit tests mock `@career/db`; the liveness e2e never touches the DB).
  */
 process.env.DATABASE_URL ??=
-  'postgres://career:career@127.0.0.1:5433/career_test';
+  'postgres://career:career@127.0.0.1:5444/career_test';
 process.env.FRONTEND_URL ??= 'http://localhost:3100';
 // auth.ts calls requireEnv('BETTER_AUTH_SECRET') at module load, so it must be
 // set before any test imports AppModule.

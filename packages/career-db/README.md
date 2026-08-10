@@ -10,13 +10,13 @@ depend on it.
 Start a local Postgres (from the repo root):
 
 ```bash
-docker compose up -d career-postgres     # postgres:16 on localhost:5433
+docker compose up -d career-postgres     # postgres:16 on 127.0.0.1:5444
 ```
 
 Point the API at it (in `apps/career-api/.env`):
 
 ```
-DATABASE_URL=postgres://career:career@127.0.0.1:5433/career
+DATABASE_URL=postgres://career:career@127.0.0.1:5444/career
 ```
 
 > Use `127.0.0.1`, not `localhost` — on macOS (Docker Desktop/OrbStack)
