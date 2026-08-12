@@ -9,6 +9,7 @@
     "start": "nest start",
     "dev": "nest build && concurrently -k -n build,api \"nest build --watch\" \"bun --watch dist/main.js\"",
     "start:prod": "node dist/main",
+    "seed": "bun src/seed.ts",
     "_dev_note": "career-api runs under bun (like prod: `bun run dist/main.js`), NOT `nest start` (Node) — Node can't load the raw-TS @career/* workspace packages. nest build bakes DTO metadata for Swagger; bun --watch reruns the compiled output on change.",
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",
     "check-types": "tsc --noEmit",

@@ -42,6 +42,21 @@ export const auth = betterAuth({
     // No verification email yet (no email provider until a later ticket); users
     // are usable immediately. emailVerified stays false until verification lands.
   },
+  user: {
+    additionalFields: {
+      // RR-006 role. `input: false` means it cannot be set or changed through
+      // the sign-up / update-user API — the source of truth is the DB, and only
+      // an admin flow (later ticket) may change it. New users default to
+      // CANDIDATE. Kept as a plain string here; the Role union lives in
+      // @career/contracts and is enforced by the authz layer.
+      role: {
+        type: 'string',
+        required: false,
+        defaultValue: 'CANDIDATE',
+        input: false,
+      },
+    },
+  },
   // CSRF + redirect allowlist. FRONTEND_URL drives this and must match CORS.
   trustedOrigins: [
     ...webOrigins,
