@@ -1,12 +1,22 @@
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { useAuthUser } from '@/lib/use-auth';
+
+/** Entry point: send authenticated users to their dashboard, others to sign-in. */
 export default function HomePage() {
+  const router = useRouter();
+  const { isPending, isAuthenticated } = useAuthUser();
+
+  useEffect(() => {
+    if (isPending) return;
+    router.replace(isAuthenticated ? '/dashboard' : '/sign-in');
+  }, [isPending, isAuthenticated, router]);
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center gap-4 p-8 text-center">
-      <h1 className="text-3xl font-bold tracking-tight">Career Platform</h1>
-      <p className="text-neutral-500">
-        Reverse-recruiting marketplace. The candidate, assistant, and admin
-        experiences are built out ticket by ticket &mdash; this is the RR-001
-        skeleton.
-      </p>
+    <main className="flex min-h-screen items-center justify-center text-sm text-neutral-500">
+      Loading…
     </main>
   );
 }
