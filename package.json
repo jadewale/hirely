@@ -11,6 +11,7 @@
     "career:auth-generate": "bunx @better-auth/cli@latest generate --config apps/career-api/src/lib/auth.ts --output packages/career-db/src/schema/auth.ts --yes",
     "career:db:generate": "bun run --cwd packages/career-db db:generate",
     "career:db:migrate": "bun run --cwd packages/career-db db:migrate",
+    "career:db:seed": "bun run --cwd apps/career-api seed",
     "career:db:studio": "bun run --cwd packages/career-db db:studio"
   },
   "devDependencies": {

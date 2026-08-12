@@ -9,4 +9,11 @@ export class SessionResponseDto {
 
   @ApiProperty({ description: 'Display name', nullable: true })
   name!: string;
+
+  @ApiProperty({
+    description: 'Authorization role',
+    enum: ['CANDIDATE', 'ASSISTANT', 'ADMIN'],
+    example: 'CANDIDATE',
+  })
+  role!: string;
 }

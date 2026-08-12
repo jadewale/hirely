@@ -5,6 +5,7 @@ import { auth } from './lib/auth';
 import { DbModule } from './db/db.module';
 import { HealthModule } from './health/health.module';
 import { SessionModule } from './auth/session.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -24,8 +25,9 @@ import { SessionModule } from './auth/session.module';
     }),
     HealthModule,
     SessionModule,
+    AdminModule,
     // Feature modules (candidates, assistants, applications, …) are added by
-    // their respective tickets. RR-005 adds auth; roles are RR-006.
+    // their respective tickets. RR-005 auth; RR-006 roles.
   ],
 })
 export class AppModule {}

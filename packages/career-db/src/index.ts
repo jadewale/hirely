@@ -11,3 +11,8 @@
 export { db, pgClient, type Database } from './client';
 export { checkDatabase, type DatabaseHealth } from './health';
 export * as schema from './schema';
+
+// Re-export the common Drizzle query operators so consumers build queries
+// through @career/db (the single DB entry point) instead of importing
+// drizzle-orm directly.
+export { eq, and, or, not, inArray, sql, desc, asc, count } from 'drizzle-orm';
