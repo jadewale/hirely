@@ -7,8 +7,9 @@
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
-    "dev": "nest start --watch",
+    "dev": "nest build && concurrently -k -n build,api \"nest build --watch\" \"bun --watch dist/main.js\"",
     "start:prod": "node dist/main",
+    "_dev_note": "career-api runs under bun (like prod: `bun run dist/main.js`), NOT `nest start` (Node) — Node can't load the raw-TS @career/* workspace packages. nest build bakes DTO metadata for Swagger; bun --watch reruns the compiled output on change.",
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",
     "check-types": "tsc --noEmit",
     "test": "jest",
@@ -17,6 +18,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@better-auth/drizzle-adapter": "^1.6.11",
     "@career/contracts": "workspace:*",
     "@career/db": "workspace:*",
     "@nestjs/common": "^11.0.1",
@@ -24,6 +26,8 @@
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/swagger": "^11.4.2",
+    "@thallesp/nestjs-better-auth": "^2.6.0",
+    "better-auth": "^1.6.11",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "zod": "^4.4.3"
@@ -39,6 +43,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.0",
     "@types/supertest": "^7.0.0",
+    "concurrently": "^9.1.2",
     "eslint": "^9.18.0",
     "jest": "^30.0.0",
     "prettier": "^3.4.2",
@@ -46,12 +51,12 @@
     "typescript": "^5.9.2"
   },
   "jest": {
-    "moduleFileExtensions": ["js", "json", "ts"],
+    "moduleFileExtensions": ["js", "json", "ts", "mjs", "cjs"],
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "setupFiles": ["<rootDir>/../test/jest.setup.ts"],
     "transform": {
-      "^.+\\.(t|j)s$": [
+      "^.+\\.(t|j|mj|cj)s$": [
         "@swc/jest",
         {
           "jsc": {
@@ -63,7 +68,9 @@
         }
       ]
     },
-    "transformIgnorePatterns": ["/node_modules/(?!@career/)"],
+    "transformIgnorePatterns": [
+      "/node_modules/(?!.*(?:@career|better-auth|@better-auth|@thallesp|better-call|rou3|nanoid|uncrypto|@noble|jose|defu|destr|ufo|hookable|consola|scule|pathe|c12|magic-regexp))"
+    ],
     "collectCoverageFrom": ["**/*.(t|j)s"],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"

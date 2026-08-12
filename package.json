@@ -8,6 +8,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "career:db:up": "docker compose up -d career-postgres",
+    "career:auth-generate": "bunx @better-auth/cli@latest generate --config apps/career-api/src/lib/auth.ts --output packages/career-db/src/schema/auth.ts --yes",
     "career:db:generate": "bun run --cwd packages/career-db db:generate",
     "career:db:migrate": "bun run --cwd packages/career-db db:migrate",
     "career:db:studio": "bun run --cwd packages/career-db db:studio"

@@ -1,1 +1,13 @@
-{"version":"7","dialect":"postgresql","entries":[]}
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1786341979310,
+      "tag": "0000_cynical_queen_noir",
+      "breakpoints": true
+    }
+  ]
+}

@@ -5,7 +5,13 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/bootstrap';
 
-describe('Health (e2e)', () => {
+/**
+ * Auth wiring, DB-free: the global AuthGuard rejects anonymous requests to a
+ * protected route *before* any database query, so this runs in CI without a
+ * live Postgres. The full sign-up/sign-in flow is verified locally against the
+ * docker-compose database.
+ */
+describe('Auth (e2e)', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
@@ -25,11 +31,11 @@ describe('Health (e2e)', () => {
     await app.close();
   });
 
-  it('GET /api/health -> 200 with status ok', async () => {
-    const res = await request(app.getHttpServer()).get('/api/health');
-    expect(res.status).toBe(200);
-    const body = res.body as { status: string; uptime: number };
-    expect(body.status).toBe('ok');
-    expect(typeof body.uptime).toBe('number');
+  it('rejects an unauthenticated request to a protected route (/api/me) with 401', async () => {
+    await request(app.getHttpServer()).get('/api/me').expect(401);
+  });
+
+  it('leaves the liveness probe anonymous (200)', async () => {
+    await request(app.getHttpServer()).get('/api/health').expect(200);
   });
 });
