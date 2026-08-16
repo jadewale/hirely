@@ -15,6 +15,13 @@
       "when": 1786495359324,
       "tag": "0001_yielding_synch",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786923203902,
+      "tag": "0002_familiar_lockheed",
+      "breakpoints": true
     }
   ]
 }

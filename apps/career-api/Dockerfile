@@ -27,6 +27,7 @@ RUN bun install --frozen-lockfile --backend=copyfile
 # runtime, so both packages must be present for `nest build` to resolve them.
 COPY packages/career-config packages/career-config
 COPY packages/career-db packages/career-db
+COPY packages/career-contracts packages/career-contracts
 COPY apps/career-api apps/career-api
 RUN bun run --cwd apps/career-api build
 
@@ -45,6 +46,7 @@ COPY --from=builder --chown=appuser:appgroup /app/apps/career-api/dist ./apps/ca
 # symlink in node_modules points here — so ship the package, including its
 # drizzle/ migrations folder.
 COPY --from=builder --chown=appuser:appgroup /app/packages/career-db ./packages/career-db
+COPY --from=builder --chown=appuser:appgroup /app/packages/career-contracts ./packages/career-contracts
 WORKDIR /app/apps/career-api
 USER appuser
 EXPOSE 4100

@@ -10,3 +10,4 @@
  * this directory, so no config change is needed when a domain is added.
  */
 export * from './auth';
+export * from './candidate-profile';
