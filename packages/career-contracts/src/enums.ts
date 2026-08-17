@@ -24,6 +24,14 @@ export const assignmentPermissionSchema = z.enum([
 ]);
 export type AssignmentPermission = z.infer<typeof assignmentPermissionSchema>;
 
+/**
+ * Account posture of an assistant's profile (RR-010). A SUSPENDED assistant is
+ * rejected from acting on any assignment by the delegated-authorization service
+ * (RR-012); only an admin can move a profile between these states.
+ */
+export const assistantStatusSchema = z.enum(['ACTIVE', 'SUSPENDED']);
+export type AssistantStatus = z.infer<typeof assistantStatusSchema>;
+
 /** Application lifecycle states (transitions enforced by the state machine, RR-023). */
 export const applicationStatusSchema = z.enum([
   'DRAFT',

@@ -29,6 +29,13 @@
       "when": 1786925801141,
       "tag": "0003_furry_franklin_richards",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786926503873,
+      "tag": "0004_tranquil_ser_duncan",
+      "breakpoints": true
     }
   ]
 }
