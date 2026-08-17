@@ -8,6 +8,7 @@ import { SessionModule } from './auth/session.module';
 import { AdminModule } from './admin/admin.module';
 import { CandidateModule } from './candidate/candidate.module';
 import { AuditModule } from './audit/audit.module';
+import { AssistantModule } from './assistant/assistant.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { AuditModule } from './audit/audit.module';
     AdminModule,
     CandidateModule,
     AuditModule,
+    AssistantModule,
     // Feature modules (candidates, assistants, applications, …) are added by
     // their respective tickets. RR-005 auth; RR-006 roles.
   ],

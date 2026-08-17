@@ -8,3 +8,4 @@ export * from './enums';
 export * from './common';
 export * from './candidate-profile';
 export * from './audit';
+export * from './assistant';
