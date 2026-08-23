@@ -230,6 +230,11 @@ resource "aws_codebuild_project" "career_api_deploy" {
     }
 
     environment_variable {
+      name  = "CAREER_RESUME_BUCKET"
+      value = aws_s3_bucket.career_resumes.bucket
+    }
+
+    environment_variable {
       name  = "DATABASE_URL_ARN"
       value = aws_ssm_parameter.career_database_url.arn
     }

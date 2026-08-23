@@ -1,6 +1,7 @@
 'use client';
 
 import { CandidateProfileForm } from '@/components/candidate-profile-form';
+import { ResumeManager } from '@/components/resume-manager';
 import { RoleGate } from '@/components/role-gate';
 import { Card } from '@/components/ui/card';
 
@@ -17,13 +18,9 @@ export default function CandidatePage() {
 
         <CandidateProfileForm />
 
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Card>
-            <h2 className="font-medium">Resumes</h2>
-            <p className="mt-1 text-sm text-neutral-500">
-              Upload and manage resumes (RR-018).
-            </p>
-          </Card>
+        <ResumeManager />
+
+        <div className="grid gap-4 sm:grid-cols-2">
           <Card>
             <h2 className="font-medium">Applications</h2>
             <p className="mt-1 text-sm text-neutral-500">

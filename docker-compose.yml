@@ -24,5 +24,35 @@ services:
       timeout: 5s
       retries: 5
 
+  # Local S3 (MinIO) for résumé uploads (RR-018). The career-api talks to it via
+  # CAREER_S3_ENDPOINT with path-style addressing. API on 9100, console on 9101
+  # (override with CAREER_MINIO_PORT / CAREER_MINIO_CONSOLE_PORT).
+  career-minio:
+    image: minio/minio
+    container_name: career-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "${CAREER_MINIO_PORT:-9100}:9000"
+      - "${CAREER_MINIO_CONSOLE_PORT:-9101}:9001"
+    volumes:
+      - career-miniodata:/data
+
+  # One-shot: create the résumé bucket and open CORS so the browser can PUT
+  # directly to MinIO from http://localhost:3100.
+  career-minio-setup:
+    image: minio/mc
+    depends_on:
+      - career-minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://career-minio:9000 minioadmin minioadmin; do sleep 1; done;
+      mc mb -p local/career-resumes || true;
+      exit 0;
+      "
+
 volumes:
   career-pgdata:
+  career-miniodata:
