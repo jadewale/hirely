@@ -5,6 +5,8 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** Parsed JSON error body, when the API returned one (e.g. Zod validation). */
+    readonly body?: unknown,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -24,7 +26,17 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
   });
   if (!res.ok) {
-    throw new ApiError(res.status, `${init?.method ?? 'GET'} ${path} → ${res.status}`);
+    let body: unknown;
+    try {
+      body = await res.json();
+    } catch {
+      body = undefined;
+    }
+    throw new ApiError(
+      res.status,
+      `${init?.method ?? 'GET'} ${path} → ${res.status}`,
+      body,
+    );
   }
   return (await res.json()) as T;
 }

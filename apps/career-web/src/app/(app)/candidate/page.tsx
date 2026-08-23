@@ -1,5 +1,6 @@
 'use client';
 
+import { CandidateProfileForm } from '@/components/candidate-profile-form';
 import { RoleGate } from '@/components/role-gate';
 import { Card } from '@/components/ui/card';
 
@@ -13,13 +14,10 @@ export default function CandidatePage() {
             Manage your profile, resumes, and applications.
           </p>
         </header>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Card>
-            <h2 className="font-medium">Profile</h2>
-            <p className="mt-1 text-sm text-neutral-500">
-              Complete onboarding (RR-009).
-            </p>
-          </Card>
+
+        <CandidateProfileForm />
+
+        <div className="grid gap-4 sm:grid-cols-3">
           <Card>
             <h2 className="font-medium">Resumes</h2>
             <p className="mt-1 text-sm text-neutral-500">
