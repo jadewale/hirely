@@ -9,6 +9,9 @@ export {
   workOrderStatusSchema,
   assignmentPermissionSchema,
   paginationQuerySchema,
+  candidateProfileInputSchema,
+  candidateProfileSchema,
+  remotePreferenceSchema,
   type Role,
   type ApplicationStatus,
   type WorkOrderStatus,
@@ -18,4 +21,7 @@ export {
   type ValidationError,
   type SuccessResponse,
   type PaginatedResponse,
+  type CandidateProfile,
+  type CandidateProfileInput,
+  type RemotePreference,
 } from '@career/contracts';
