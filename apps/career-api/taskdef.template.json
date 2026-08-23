@@ -18,7 +18,9 @@
         { "name": "NODE_ENV", "value": "production" },
         { "name": "PORT", "value": "${API_PORT}" },
         { "name": "FRONTEND_URL", "value": "${FRONTEND_URL}" },
-        { "name": "BETTER_AUTH_URL", "value": "${BETTER_AUTH_URL}" }
+        { "name": "BETTER_AUTH_URL", "value": "${BETTER_AUTH_URL}" },
+        { "name": "AWS_REGION", "value": "${AWS_DEFAULT_REGION}" },
+        { "name": "CAREER_RESUME_BUCKET", "value": "${CAREER_RESUME_BUCKET}" }
       ],
       "secrets": [
         { "name": "DATABASE_URL", "valueFrom": "${DATABASE_URL_ARN}" },
