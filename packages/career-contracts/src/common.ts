@@ -10,6 +10,14 @@ import { z } from 'zod';
 export const idSchema = z.uuid();
 export type Id = z.infer<typeof idSchema>;
 
+/**
+ * A Better Auth user id. NOT a UUID — Better Auth mints random alphanumeric ids
+ * (e.g. `26tDhxI5EOBXGlL6ynNfDprIY4eaDEGV`) and stores them as `text`. Use this
+ * anywhere a `user.id` is referenced (never `idSchema`, which is uuid-only).
+ */
+export const userIdSchema = z.string().min(1).max(255);
+export type UserId = z.infer<typeof userIdSchema>;
+
 /** Pagination request (query params). Coerces string query values to numbers. */
 export const paginationQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),

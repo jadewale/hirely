@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { roleSchema } from './enums';
 import {
   idSchema,
+  userIdSchema,
   paginatedResponseSchema,
   paginationQuerySchema,
 } from './common';
@@ -52,7 +53,7 @@ export type AuditMetadata = z.infer<typeof auditMetadataSchema>;
  * request id) down to an internal job (`{ action, resourceType, resourceId }`).
  */
 export const auditRecordInputSchema = z.object({
-  actorUserId: idSchema.nullable(),
+  actorUserId: userIdSchema.nullable(),
   actorRole: roleSchema.nullable().optional(),
   candidateId: idSchema.nullable().optional(),
   assignmentId: idSchema.nullable().optional(),
@@ -69,7 +70,7 @@ export type AuditRecordInput = z.infer<typeof auditRecordInputSchema>;
 /** Persisted, admin-visible audit entry (RR-016 lists these). */
 export const auditEntrySchema = z.object({
   id: idSchema,
-  actorUserId: idSchema.nullable(),
+  actorUserId: userIdSchema.nullable(),
   actorRole: roleSchema.nullable(),
   candidateId: idSchema.nullable(),
   assignmentId: idSchema.nullable(),
@@ -90,7 +91,7 @@ export type AuditEntry = z.infer<typeof auditEntrySchema>;
  * Coerces query strings so it can bind to Nest `@Query()` directly.
  */
 export const auditQuerySchema = paginationQuerySchema.extend({
-  actorUserId: idSchema.optional(),
+  actorUserId: userIdSchema.optional(),
   candidateId: idSchema.optional(),
   assignmentId: idSchema.optional(),
   action: auditActionSchema.optional(),

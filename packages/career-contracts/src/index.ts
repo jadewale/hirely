@@ -10,3 +10,4 @@ export * from './candidate-profile';
 export * from './audit';
 export * from './assistant';
 export * from './resume';
+export * from './assignment';
