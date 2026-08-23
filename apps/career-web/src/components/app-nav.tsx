@@ -33,6 +33,14 @@ export function AppNav({ role, name }: { role: Role | null; name: string }) {
               Dashboard
             </Link>
           )}
+          {role && (
+            <Link
+              href="/jobs"
+              className="text-sm text-neutral-600 hover:text-neutral-900"
+            >
+              Jobs
+            </Link>
+          )}
         </div>
         <div className="flex items-center gap-3 text-sm">
           {role && (

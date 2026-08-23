@@ -21,6 +21,7 @@ export {
   or,
   not,
   inArray,
+  ilike,
   sql,
   desc,
   asc,
